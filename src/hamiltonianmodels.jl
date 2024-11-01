@@ -6,6 +6,42 @@ const σy = ComplexF64[0 -1im; 1im 0]
 const σz = ComplexF64[1 0; 0 -1]
 const id2 = ComplexF64[1 0; 0 1]
 
+function const_Sx(S::Real)
+    dims = Int(2*S + 1)
+    ms = [-S+i-1 for i in 1:dims]
+    Sx = zeros(ComplexF64, dims, dims)
+    for j in 1:dims, i in 1:dims
+        if abs(i-j) == 1
+            Sx[i,j] = 1/2 * sqrt(S*(S+1)-ms[i]*ms[j]) 
+        end
+    end
+    return Sx
+end
+
+function const_Sy(S::Real)
+    dims = Int(2*S + 1)
+    ms = [-S+i-1 for i in 1:dims]
+    Sy = zeros(ComplexF64, dims, dims)
+    for j in 1:dims, i in 1:dims
+        if i-j == 1
+            Sy[i,j] = -1/2/1im * sqrt(S*(S+1)-ms[i]*ms[j]) 
+        elseif j-i == 1
+            Sy[i,j] =  1/2/1im * sqrt(S*(S+1)-ms[i]*ms[j]) 
+        end
+    end
+    return Sy
+end
+
+function const_Sz(S::Real)
+    dims = Int(2*S + 1)
+    ms = [S-i+1 for i in 1:dims]
+    Sz = zeros(ComplexF64, dims, dims)
+    for i in 1:dims
+        Sz[i,i] = ms[i]
+    end
+    return Sz
+end
+
 abstract type HamiltonianModel end
 
 @doc raw"
@@ -143,6 +179,7 @@ end
 return a struct representing the K_J_Γ_Γ′ model
 "
 struct K_J_Γ_Γ′{T<:Real} <: HamiltonianModel
+    S::Real
     K::T
     J::T
     Γ::T
@@ -156,13 +193,16 @@ return the K_J_Γ_Γ′ hamiltonian for the `model` as a two-site operator.
 """
 function hamiltonian(model::K_J_Γ_Γ′)
     op = ein"ij,kl -> ijkl"
-    Heisenberg = model.J * (op(σz, σz) +
-                            op(σx, σx) +
-                            op(σy, σy) )
-    hx = Heisenberg + model.K * op(σx, σx) + model.Γ * (op(σy, σz) + op(σz, σy)) + model.Γ′ * (op(σx, σy) + op(σy, σx) + op(σz, σx) + op(σx, σz))
-    hy = Heisenberg + model.K * op(σy, σy) + model.Γ * (op(σx, σz) + op(σz, σx)) + model.Γ′ * (op(σy, σx) + op(σx, σy) + op(σz, σy) + op(σy, σz))
-    hz = Heisenberg + model.K * op(σz, σz) + model.Γ * (op(σx, σy) + op(σy, σx)) + model.Γ′ * (op(σz, σx) + op(σx, σz) + op(σy, σz) + op(σz, σy))
-    hx / 8, hy / 8, hz / 8
+    Sz = const_Sz(model.S)
+    Sx = const_Sx(model.S)
+    Sy = const_Sy(model.S)
+    Heisenberg = model.J * (op(Sz, Sz) +
+                            op(Sx, Sx) +
+                            op(Sy, Sy) )
+    hx = Heisenberg + model.K * op(Sx, Sx) + model.Γ * (op(Sy, Sz) + op(Sz, Sy)) + model.Γ′ * (op(Sx, Sy) + op(Sy, Sx) + op(Sz, Sx) + op(Sx, Sz))
+    hy = Heisenberg + model.K * op(Sy, Sy) + model.Γ * (op(Sx, Sz) + op(Sz, Sx)) + model.Γ′ * (op(Sy, Sx) + op(Sx, Sy) + op(Sz, Sy) + op(Sy, Sz))
+    hz = Heisenberg + model.K * op(Sz, Sz) + model.Γ * (op(Sx, Sy) + op(Sy, Sx)) + model.Γ′ * (op(Sz, Sx) + op(Sx, Sz) + op(Sy, Sz) + op(Sz, Sy))
+    hx / 2, hy / 2, hz / 2
 end
 
 @doc raw"

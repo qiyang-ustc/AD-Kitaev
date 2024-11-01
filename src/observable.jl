@@ -49,10 +49,11 @@ function observable(model, fdirection, field, type, folder, atype, D, χ, targχ
         bulk, key = init_ipeps(model, fdirection, field; folder = folder, type = type, atype = atype, Ni = Ni, Nj = Nj, D=D, χ=χ, tol=tol, maxiter=maxiter, miniter=miniter, verbose = true)
         folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter, miniter = key
         h = hamiltonian(model)
-        oc = optcont(D, targχ)
+        d = Int(2*model.S + 1) ^ 2
+        oc = optcont(D, targχ, d)
         bulk = buildbcipeps(bulk,Ni,Nj)
         ap = [ein"abcdx,ijkly -> aibjckdlxy"(bulk[i], conj(bulk[i])) for i = 1:Ni*Nj]
-        ap = [atype(reshape(ap[i], D^2, D^2, D^2, D^2, 4, 4)) for i = 1:Ni*Nj]
+        ap = [atype(reshape(ap[i], D^2, D^2, D^2, D^2, d, d)) for i = 1:Ni*Nj]
         ap = reshape(ap, Ni, Nj)
         a = atype(zeros(ComplexF64, D^2,D^2,D^2,D^2,Ni,Nj))
         for j in 1:Nj, i in 1:Ni
@@ -75,12 +76,15 @@ function observable(model, fdirection, field, type, folder, atype, D, χ, targχ
         ξ = cor_len(ALu, ALd)
 
         M = Array{Array{ComplexF64,1},3}(undef, Ni, Nj, 2)
-        Sx1 = reshape(ein"ab,cd -> acbd"(σx/2, I(2)), (4,4))
-        Sx2 = reshape(ein"ab,cd -> acbd"(I(2), σx/2), (4,4))
-        Sy1 = reshape(ein"ab,cd -> acbd"(σy/2, I(2)), (4,4))
-        Sy2 = reshape(ein"ab,cd -> acbd"(I(2), σy/2), (4,4))
-        Sz1 = reshape(ein"ab,cd -> acbd"(σz/2, I(2)), (4,4))
-        Sz2 = reshape(ein"ab,cd -> acbd"(I(2), σz/2), (4,4))
+        Sx = const_Sx(model.S)
+        Sy = const_Sy(model.S)
+        Sz = const_Sz(model.S)
+        Sx1 = reshape(ein"ab,cd -> acbd"(Sx, I(Int(sqrt(d)))), (d,d))
+        Sx2 = reshape(ein"ab,cd -> acbd"(I(Int(sqrt(d))), Sx), (d,d))
+        Sy1 = reshape(ein"ab,cd -> acbd"(Sy, I(Int(sqrt(d)))), (d,d))
+        Sy2 = reshape(ein"ab,cd -> acbd"(I(Int(sqrt(d))), Sy), (d,d))
+        Sz1 = reshape(ein"ab,cd -> acbd"(Sz, I(Int(sqrt(d)))), (d,d))
+        Sz2 = reshape(ein"ab,cd -> acbd"(I(Int(sqrt(d))), Sz), (d,d))
         etol = 0.0
         logfile = open(observable_log, "a")
         for j = 1:Nj, i = 1:Ni
@@ -115,13 +119,14 @@ function observable(model, fdirection, field, type, folder, atype, D, χ, targχ
 
         oc1, oc2 = oc
         hx, hy, hz = h
-        Sx = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hx, I(2)), (4,4,4,4)))
-        Sy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hy, I(2)), (4,4,4,4)))
-        Sz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hz, I(2)), (4,4,4,4)))
+        Id = I(Int(sqrt(d)))
+        Sx = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hx, Id), (d,d,d,d)))
+        Sy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d,d,d,d)))
+        Sz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d,d,d,d)))
         ap /= norm(ap)
-        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (4,4)))
-        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hy, I(2)), (4,4,4,4)))
-        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hz, I(2)), (4,4,4,4)))
+        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d,d)))
+        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d,d,d,d)))
+        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d,d,d,d)))
 
         Ex, Ey, Ez = 0, 0, 0
         for j = 1:Nj, i = 1:Ni

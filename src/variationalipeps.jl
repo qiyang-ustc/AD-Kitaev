@@ -18,10 +18,11 @@ return the energy of the `bcipeps` 2-site hamiltonian `h` and calculated via a
 TeneT with parameters `χ`, `tol` and `maxiter`.
 """
 function energy(h, bulk, oc, key; savefile = true, show_every = Inf)
-    folder, _, _, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose = key
+    folder, model, _, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose = key
     # bcipeps = indexperm_symmetrize(bcipeps)  # NOTE: this is not good
+    d = Int(2*model.S + 1) ^ 2
     ap = [ein"abcdx,ijkly -> aibjckdlxy"(bulk[i], conj(bulk[i])) for i = 1:Ni*Nj]
-    ap = [reshape(ap[i], D^2, D^2, D^2, D^2, 4, 4) for i = 1:Ni*Nj]
+    ap = [reshape(ap[i], D^2, D^2, D^2, D^2, d, d) for i = 1:Ni*Nj]
     ap = reshape(ap, Ni, Nj)
     
     a = Zygote.Buffer(ap[1], D^2,D^2,D^2,D^2,Ni,Nj)
@@ -51,10 +52,10 @@ j ────┴──l ──┴──── o                        │     
 ```
 where the central two block are six order tensor have extra bond `pq` and `rs`
 """
-function optcont(D::Int, χ::Int)
-    sd = Dict('a' => χ, 'b' => D^2,'c' => χ, 'e' => D^2, 'f' => χ, 'g' => D^2, 'h' => D^2, 'i' => D^2, 'j' => χ, 'k' => D^2, 'l' => χ, 'n' => D^2, 'o' => χ, 'p' => 4, 'q' => 4, 'r' => 4, 's' => 4)
+function optcont(D::Int, χ::Int, d::Int)
+    sd = Dict('a' => χ, 'b' => D^2,'c' => χ, 'e' => D^2, 'f' => χ, 'g' => D^2, 'h' => D^2, 'i' => D^2, 'j' => χ, 'k' => D^2, 'l' => χ, 'n' => D^2, 'o' => χ, 'p' => d, 'q' => d, 'r' => d, 's' => d)
     oc1 = optimize_greedy(ein"agj,abc,gkhbpq,jkl,fio,cef,hniers,lno -> pqrs", sd; method=MinSpaceDiff())
-    sd = Dict('a' => χ, 'b' => D^2, 'c' => χ, 'e' => D^2, 'f' => D^2, 'g' => χ, 'h' => D^2, 'i' => χ, 'j' => D^2, 'k' => D^2, 'l' => χ, 'm' => D^2, 'n' => χ, 'r' => 4, 's' => 4, 'p' => 4, 'q' => 4)
+    sd = Dict('a' => χ, 'b' => D^2, 'c' => χ, 'e' => D^2, 'f' => D^2, 'g' => χ, 'h' => D^2, 'i' => χ, 'j' => D^2, 'k' => D^2, 'l' => χ, 'm' => D^2, 'n' => χ, 'r' => d, 's' => d, 'p' => d, 'q' => d)
     oc2 = optimize_greedy(ein"abc,aeg,ehfbpq,cfi,gjl,jmkhrs,ikn,lmn -> pqrs", sd; method=MinSpaceDiff())
     oc1, oc2
 end
@@ -69,7 +70,8 @@ a `SquareBCVUMPSRuntime` `env`.
 """
 function expectationvalue(h, ap, env, oc, key)
     _, ALu, Cu, ARu, ALd, Cd, ARd, FL, FR, FLu, FRu = env
-    _, _, field, atype, Ni, Nj, _, _, _, _, _, _, verbose = key
+    _, model, field, atype, Ni, Nj, _, _, _, _, _, _, verbose = key
+    d = Int(2*model.S + 1) ^ 2
     oc1, oc2 = oc
     ACu = ALCtoAC(ALu, Cu)
     ACd = ALCtoAC(ALd, Cd)
@@ -77,9 +79,9 @@ function expectationvalue(h, ap, env, oc, key)
     ap /= norm(ap)
     etol = 0
     Zygote.@ignore begin
-        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (4,4)))
-        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hy, I(2)), (4,4,4,4)))
-        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(2), hz, I(2)), (4,4,4,4)))
+        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d,d)))
+        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(Int(sqrt(d))), hy, I(Int(sqrt(d)))), (d,d,d,d)))
+        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(Int(sqrt(d))), hz, I(Int(sqrt(d)))), (d,d,d,d)))
     end
 
     for j = 1:Nj, i = 1:Ni
@@ -109,13 +111,17 @@ function expectationvalue(h, ap, env, oc, key)
     
     if field != 0.0
         Sx1, Sx2, Sy1, Sy2, Sz1, Sz2 = [],[],[],[],[],[]
+        Sx = const_Sx(model.S)
+        Sy = const_Sy(model.S)
+        Sz = const_Sz(model.S)
         Zygote.@ignore begin
-            Sx1 = reshape(ein"ab,cd -> acbd"(σx/2, I(2)), (4,4))
-            Sx2 = reshape(ein"ab,cd -> acbd"(I(2), σx/2), (4,4))
-            Sy1 = reshape(ein"ab,cd -> acbd"(σy/2, I(2)), (4,4))
-            Sy2 = reshape(ein"ab,cd -> acbd"(I(2), σy/2), (4,4))
-            Sz1 = reshape(ein"ab,cd -> acbd"(σz/2, I(2)), (4,4))
-            Sz2 = reshape(ein"ab,cd -> acbd"(I(2), σz/2), (4,4))
+            Id = I(Int(sqrt(d)))
+            Sx1 = reshape(ein"ab,cd -> acbd"(Sx, Id), (d,d))
+            Sx2 = reshape(ein"ab,cd -> acbd"(Id, Sx), (d,d))
+            Sy1 = reshape(ein"ab,cd -> acbd"(Sy, Id), (d,d))
+            Sy2 = reshape(ein"ab,cd -> acbd"(Id, Sy), (d,d))
+            Sz1 = reshape(ein"ab,cd -> acbd"(Sz, Id), (d,d))
+            Sz2 = reshape(ein"ab,cd -> acbd"(Id, Sz), (d,d))
         end
         for j = 1:Nj, i = 1:Ni
             ir = Ni + 1 - i
@@ -191,7 +197,8 @@ function init_ipeps(model::HamiltonianModel,
         bulk = load(chkp_file)["bcipeps"]
         verbose && println("load BCiPEPS from $chkp_file")
     else
-        bulk = rand(ComplexF64,D,D,D,D,4,Ni*Nj)
+        d = Int(2*model.S + 1) ^ 2
+        bulk = rand(ComplexF64,D,D,D,D,d,Ni*Nj)
         verbose && println("random initial BCiPEPS $chkp_file")
     end
     bulk /= norm(bulk)
@@ -220,7 +227,8 @@ function optimiseipeps(bulk, key;
     keyback = folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter_ad, miniter_ad, ifcheckpoint, verbose
     h = hamiltonian(model)
     to = TimerOutput()
-    oc = optcont(D, χ)
+    d = Int(2*model.S + 1) ^ 2
+    oc = optcont(D, χ, d)
     f(x) = @timeit to "forward" real(energy(h, buildbcipeps(atype(x),Ni,Nj), oc, key))
     ff(x) = real(energy(h, buildbcipeps(atype(x),Ni,Nj), oc, keyback))
     function g(x)
