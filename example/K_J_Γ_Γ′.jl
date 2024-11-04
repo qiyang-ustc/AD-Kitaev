@@ -5,20 +5,20 @@ using Optim
 CUDA.allowscalar(false)
 
 Random.seed!(100)
-# folder = "./example/data/"
-folder = "./../../../../data/xyzhang/AD_Kitaev/"
-bulk, key = init_ipeps(K_J_Γ_Γ′(1.5, 1.0, 0.0, 0.0, 0.0), 
+folder = "./example/data/QQ/"
+# folder = "./../../../../data/xyzhang/AD_Kitaev/"
+bulk, key = init_ipeps(K_J_Γ_Γ′(1.0, -1.0, 0.0, 0.0, 0.0), 
                        [1.0,1.0,1.0], 0.0; 
                        Ni=1, Nj=1, 
-                       D=5, χ=60, 
+                       D=2, χ=10, 
                        tol=1e-10, maxiter=50, miniter=1,
                        folder=folder, 
                        type = "_random",
-                       atype = CuArray
+                       atype = Array
                        )
 
 optimiseipeps(bulk, key; 
               f_tol = 1e-10, 
-              opiter = 0, 
+              opiter = 1000, 
               verbose = true
               )

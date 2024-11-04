@@ -1,5 +1,5 @@
 using FileIO
-using LinearAlgebra: I, norm
+using LinearAlgebra
 using LineSearches
 using OMEinsum: get_size_dict, optimize_greedy,  MinSpaceDiff
 using Optim
@@ -31,7 +31,7 @@ function energy(h, bulk, oc, key; savefile = true, show_every = Inf)
     end
     a = copy(a)
 
-    env = obs_env(a; χ = χ, tol = tol, maxiter = maxiter, miniter = miniter, verbose = verbose, savefile = savefile, infolder = folder, outfolder = folder, savetol = 1e-3, show_every = show_every)
+    env = obs_env(a; updown = true, χ = χ, tol = tol, maxiter = maxiter, miniter = miniter, verbose = verbose, savefile = savefile, infolder = folder, outfolder = folder, savetol = 1e-3, show_every = show_every)
     e = ifcheckpoint ? checkpoint(expectationvalue, h, ap, env, oc, key) : expectationvalue(h, ap, env, oc, key)
     return e
 end
@@ -158,8 +158,32 @@ checkerboard pattern
 """
 ito12(i,Ni) = mod(mod(i,Ni) + Ni*(mod(i,Ni)==0) + fld(i,Ni) + 1 - (mod(i,Ni)==0), 2) + 1
 
-function buildbcipeps(bulk,Ni,Nj)
+function bulid_QQ(S)
+    d = Int(2*S + 1)
+    Q = zeros(ComplexF64, 2,2,2,d,d)
+    Q[1,1,1,:,:] .= I(d)
+    Q[1,2,2,:,:] .= exp(1im * π * 0.5 * const_Sx(S))
+    Q[2,1,2,:,:] .= exp(1im * π * 0.5 * const_Sx(S))
+    Q[2,2,1,:,:] .= exp(1im * π * 0.5 * const_Sx(S))
+    QQ = ein"edapq, ebcrs -> abcdprqs"(Q, Q)
+    return reshape(QQ, 2,2,2,2,d^2,d^2)
+end
+
+function constrain(A, QQ)
+    D, N = size(A)[[1,6]]
+    d = size(QQ, 5)
+    bulk = Zygote.Buffer(A, D*2,D*2,D*2,D*2,d,N)
+    for i in 1:N
+        bulk[:,:,:,:,:,i] = reshape(ein"abcdx, efghxy -> aebfcgdhy"(A[:,:,:,:,:,i], QQ), D*2,D*2,D*2,D*2,d)
+    end
+    return copy(bulk)
+end
+
+function buildbcipeps(bulk, S, Ni, Nj)
     bulk /= norm(bulk)
+    atype = _arraytype(bulk)
+    QQ = Zygote.@ignore atype(bulid_QQ(S))
+    bulk = constrain(bulk, QQ)
     reshape([bulk[:,:,:,:,:,i] for i = 1:Ni*Nj], (Ni, Nj))
 end
 
@@ -192,7 +216,7 @@ function init_ipeps(model::HamiltonianModel,
         field = field * fdirection / norm(fdirection)
     end
     mkpath(folder)
-    chkp_file = folder*"D$(D)_chi$(χ)_tol$(tol)_maxiter$(maxiter)_miniter$(miniter).jld2"
+    chkp_file = folder*"D$(D*2)_chi$(χ)_tol$(tol)_maxiter$(maxiter)_miniter$(miniter).jld2"
     if isfile(chkp_file)
         bulk = load(chkp_file)["bcipeps"]
         verbose && println("load BCiPEPS from $chkp_file")
@@ -202,7 +226,7 @@ function init_ipeps(model::HamiltonianModel,
         verbose && println("random initial BCiPEPS $chkp_file")
     end
     bulk /= norm(bulk)
-    key = (folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose)
+    key = (folder, model, field, atype, Ni, Nj, D*2, χ, tol, maxiter, miniter, ifcheckpoint, verbose)
     return bulk, key
 end
 
@@ -220,17 +244,19 @@ function optimiseipeps(bulk, key;
                        maxiter_ad = 10,
                        miniter_ad = 1,
                        verbose = false, 
-                       optimmethod = LBFGS(m = 20)
+                       optimmethod = LBFGS(m = 20, 
+                       alphaguess=LineSearches.InitialStatic(alpha=1e-5))
                        )
 
     folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose = key
     keyback = folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter_ad, miniter_ad, ifcheckpoint, verbose
     h = hamiltonian(model)
     to = TimerOutput()
-    d = Int(2*model.S + 1) ^ 2
+    S = model.S
+    d = Int(2*S + 1) ^ 2
     oc = optcont(D, χ, d)
-    f(x) = @timeit to "forward" real(energy(h, buildbcipeps(atype(x),Ni,Nj), oc, key))
-    ff(x) = real(energy(h, buildbcipeps(atype(x),Ni,Nj), oc, keyback))
+    f(x) = @timeit to "forward" real(energy(h, buildbcipeps(atype(x),S,Ni,Nj), oc, key))
+    ff(x) = real(energy(h, buildbcipeps(atype(x),S,Ni,Nj), oc, keyback))
     function g(x)
         @timeit to "backward" begin
             println("for backward convergence:")
