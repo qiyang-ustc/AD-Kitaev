@@ -1,16 +1,25 @@
 using FileIO
-using LinearAlgebra: I, norm
+using LinearAlgebra
 using LineSearches
 using OMEinsum: get_size_dict, optimize_greedy,  MinSpaceDiff
 using Optim
 using Printf: @sprintf
 using TimerOutputs
 using TeneT
+using TeneT: qrpos
 using TeneT: ALCtoAC
 using CUDA
 
 export init_ipeps, energy, optimiseipeps
 
+function to_normal(ipeps, D, d)
+    a = Zygote.Buffer(ipeps, D,D,D,D,d)
+    for i in 1:D, j in 1:D, k in 1:d
+        U, _ = qrpos(reshape(ipeps[1:end-D], D,D,D,D,d)[i,:,j,:,k])
+        a[i,:,j,:,k] = U * Diagonal(ipeps[end-D+1:end]) * U'
+    end
+    return copy(a)
+end
 """
     energy(h, bulk, oc, key; savefile = true, show_every = Inf)
 
@@ -20,6 +29,11 @@ TeneT with parameters `χ`, `tol` and `maxiter`.
 function energy(h, bulk, oc, key; savefile = true, show_every = Inf)
     folder, _, _, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose = key
     # bcipeps = indexperm_symmetrize(bcipeps)  # NOTE: this is not good
+    # @show exp(1im * real(bulk[1][end]))
+    # bulk = [reshape(bulk[i][1:end-1], D,D,D,D,4) + 1im * permutedims(reshape(conj(bulk[i][1:end-1]), D,D,D,D,4),(1,4,3,2,5)) for i = 1:Ni*Nj]
+    
+    # bulk = [bulk[i] + conj(permutedims(bulk[i], (2,1,4,3,5))) for i = 1:Ni*Nj]
+    # bulk = [to_normal(bulk[i], D, 4) for i = 1:Ni*Nj]
     ap = [ein"abcdx,ijkly -> aibjckdlxy"(bulk[i], conj(bulk[i])) for i = 1:Ni*Nj]
     ap = [reshape(ap[i], D^2, D^2, D^2, D^2, 4, 4) for i = 1:Ni*Nj]
     ap = reshape(ap, Ni, Nj)
@@ -30,7 +44,7 @@ function energy(h, bulk, oc, key; savefile = true, show_every = Inf)
     end
     a = copy(a)
 
-    env = obs_env(a; χ = χ, tol = tol, maxiter = maxiter, miniter = miniter, verbose = verbose, savefile = savefile, infolder = folder, outfolder = folder, savetol = 1e-3, show_every = show_every)
+    env = obs_env(a; updown = true, χ = χ, tol = tol, maxiter = maxiter, miniter = miniter, verbose = verbose, savefile = savefile, infolder = folder, outfolder = folder, savetol = 1e-3, show_every = show_every)
     e = ifcheckpoint ? checkpoint(expectationvalue, h, ap, env, oc, key) : expectationvalue(h, ap, env, oc, key)
     return e
 end
@@ -152,8 +166,30 @@ checkerboard pattern
 """
 ito12(i,Ni) = mod(mod(i,Ni) + Ni*(mod(i,Ni)==0) + fld(i,Ni) + 1 - (mod(i,Ni)==0), 2) + 1
 
+function bulid_QQ()
+    Q = zeros(ComplexF64, 2,2,2,2,2)
+    Q[1,1,1,:,:] .= I(2)
+    Q[1,2,2,:,:] .= exp(1im * π * 0.5 * σx)
+    Q[2,1,2,:,:] .= exp(1im * π * 0.5 * σy)
+    Q[2,2,1,:,:] .= exp(1im * π * 0.5 * σz)
+    QQ = ein"edapq, ebcrs -> abcdprqs"(Q, Q)
+    return reshape(QQ, 2,2,2,2,4,4)
+end
+
+function constrain(A, QQ)
+    D, N = size(A)[[1,6]]
+    bulk = Zygote.Buffer(A, D*2,D*2,D*2,D*2,4,N)
+    for i in 1:N
+        bulk[:,:,:,:,:,i] = reshape(ein"abcdx, efghxy -> aebfcgdhy"(A[:,:,:,:,:,i], QQ), D*2,D*2,D*2,D*2,4)
+    end
+    return copy(bulk)
+end
+
 function buildbcipeps(bulk,Ni,Nj)
     bulk /= norm(bulk)
+    atype = _arraytype(bulk)
+    QQ = Zygote.@ignore atype(bulid_QQ())
+    bulk = constrain(bulk, QQ)
     reshape([bulk[:,:,:,:,:,i] for i = 1:Ni*Nj], (Ni, Nj))
 end
 
@@ -186,7 +222,7 @@ function init_ipeps(model::HamiltonianModel,
         field = field * fdirection / norm(fdirection)
     end
     mkpath(folder)
-    chkp_file = folder*"D$(D)_chi$(χ)_tol$(tol)_maxiter$(maxiter)_miniter$(miniter).jld2"
+    chkp_file = folder*"D$(D*2)_chi$(χ)_tol$(tol)_maxiter$(maxiter)_miniter$(miniter).jld2"
     if isfile(chkp_file)
         bulk = load(chkp_file)["bcipeps"]
         verbose && println("load BCiPEPS from $chkp_file")
@@ -195,7 +231,7 @@ function init_ipeps(model::HamiltonianModel,
         verbose && println("random initial BCiPEPS $chkp_file")
     end
     bulk /= norm(bulk)
-    key = (folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose)
+    key = (folder, model, field, atype, Ni, Nj, D*2, χ, tol, maxiter, miniter, ifcheckpoint, verbose)
     return bulk, key
 end
 
@@ -213,7 +249,8 @@ function optimiseipeps(bulk, key;
                        maxiter_ad = 10,
                        miniter_ad = 1,
                        verbose = false, 
-                       optimmethod = LBFGS(m = 20)
+                       optimmethod = LBFGS(m = 20, 
+                       alphaguess=LineSearches.InitialStatic(alpha=1e-5))
                        )
 
     folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose = key
