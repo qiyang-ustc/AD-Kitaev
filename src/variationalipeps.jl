@@ -111,10 +111,10 @@ function expectationvalue(h, ap, env, oc, key)
     
     if field != 0.0
         Sx1, Sx2, Sy1, Sy2, Sz1, Sz2 = [],[],[],[],[],[]
-        Sx = const_Sx(model.S)
-        Sy = const_Sy(model.S)
-        Sz = const_Sz(model.S)
         Zygote.@ignore begin
+            Sx = const_Sx(model.S)
+            Sy = const_Sy(model.S)
+            Sz = const_Sz(model.S)
             Id = I(Int(sqrt(d)))
             Sx1 = reshape(ein"ab,cd -> acbd"(Sx, Id), (d,d))
             Sx2 = reshape(ein"ab,cd -> acbd"(Id, Sx), (d,d))
@@ -136,7 +136,7 @@ function expectationvalue(h, ap, env, oc, key)
             M1 = [Array(Mx1)[]/n3, Array(My1)[]/n3, Array(Mz1)[]/n3]
             M2 = [Array(Mx2)[]/n3, Array(My2)[]/n3, Array(Mz2)[]/n3]
             verbose && (@show M1 M2)
-            etol -= (M1 + M2)' * field / 2
+            # etol -= (M1 + M2)' * field / 2
         end
     end
 
@@ -162,9 +162,9 @@ function bulid_QQ(S)
     d = Int(2*S + 1)
     Q = zeros(ComplexF64, 2,2,2,d,d)
     Q[1,1,1,:,:] .= I(d)
-    Q[1,2,2,:,:] .= exp(1im * π * 0.5 * const_Sx(S))
-    Q[2,1,2,:,:] .= exp(1im * π * 0.5 * const_Sx(S))
-    Q[2,2,1,:,:] .= exp(1im * π * 0.5 * const_Sx(S))
+    Q[1,2,2,:,:] .= exp(1im * π * const_Sx(S))
+    Q[2,1,2,:,:] .= exp(1im * π * const_Sy(S))
+    Q[2,2,1,:,:] .= exp(1im * π * const_Sz(S))
     QQ = ein"edapq, ebcrs -> abcdprqs"(Q, Q)
     return reshape(QQ, 2,2,2,2,d^2,d^2)
 end
