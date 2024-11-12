@@ -1,12 +1,9 @@
-export diaglocal, TFIsing, Heisenberg, Kitaev, Kitaev_Heisenberg, K_J_Γ_Γ′, K_Γ
-export hamiltonian, HamiltonianModel
-
 const σx = ComplexF64[0 1; 1 0]
 const σy = ComplexF64[0 -1im; 1im 0]
 const σz = ComplexF64[1 0; 0 -1]
 const id2 = ComplexF64[1 0; 0 1]
 
-function const_Sx(S::Real)
+function const_Sx(S::Rational)
     dims = Int(2*S + 1)
     ms = [-S+i-1 for i in 1:dims]
     Sx = zeros(ComplexF64, dims, dims)
@@ -18,7 +15,7 @@ function const_Sx(S::Real)
     return Sx
 end
 
-function const_Sy(S::Real)
+function const_Sy(S::Rational)
     dims = Int(2*S + 1)
     ms = [-S+i-1 for i in 1:dims]
     Sy = zeros(ComplexF64, dims, dims)
@@ -32,7 +29,7 @@ function const_Sy(S::Real)
     return Sy
 end
 
-function const_Sz(S::Real)
+function const_Sz(S::Rational)
     dims = Int(2*S + 1)
     ms = [S-i+1 for i in 1:dims]
     Sz = zeros(ComplexF64, dims, dims)
@@ -128,12 +125,13 @@ end
 return a struct representing the Kitaev model with magnetisation fields
 `Jx`, `Jy` and `Jz`..
 "
-struct Kitaev{T<:Real} <: HamiltonianModel
-    Jz::T
-    Jx::T
-    Jy::T
+struct Kitaev <: HamiltonianModel
+    S::Rational
+    Jz::Real
+    Jx::Real
+    Jy::Real
 end
-Kitaev() = Kitaev(-1.0, -1.0, -1.0)
+Kitaev() = Kitaev(1//2, -1.0, -1.0, -1.0)
 
 """
     hamiltonian(model::Kitaev)
@@ -141,10 +139,14 @@ Kitaev() = Kitaev(-1.0, -1.0, -1.0)
 return the Kitaev hamiltonian for the `model` as a two-site operator.
 """
 function hamiltonian(model::Kitaev)
-    hx = model.Jx * ein"ij,kl -> ijkl"(σx, σx)
-    hy = model.Jy * ein"ij,kl -> ijkl"(σy, σy)
-    hz = model.Jz * ein"ij,kl -> ijkl"(σz, σz)
-    hx / 8, hy / 8, hz / 8
+    S = model.S
+    Sx = const_Sx(S)
+    Sy = const_Sy(S)
+    Sz = const_Sz(S)
+    hx = model.Jx * ein"ij,kl -> ijkl"(Sx, Sx)
+    hy = model.Jy * ein"ij,kl -> ijkl"(Sy, Sy)
+    hz = model.Jz * ein"ij,kl -> ijkl"(Sz, Sz)
+    return hx, hy, hz
 end
 
 @doc raw"
