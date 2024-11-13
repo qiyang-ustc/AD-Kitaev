@@ -44,8 +44,8 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
             ir  = mod1(i + 1, Ni)
             irr = mod1(Ni - i, Ni) 
             lr = oc_V(ACu[i,j],FLu[i,j],ap[i,j],FRu[i,j],FLo[ir,j],ap[ir,j],FRo[ir,j],conj(ACd[irr,j]))
-            e = Array(ein"pqrs, pqrs -> "(lr,h_V))[]
-            n = Array(ein"pprr -> "(lr))[]
+            e = sum(ein"pqrs, pqrs -> "(lr,h_V))
+            n = sum(ein"pprr -> "(lr))
             params.verbosity >= 4 && println("Vertical energy = $(e/n)")
             etol += e/n
         else
@@ -55,8 +55,8 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
         lr = oc_H(FLo[i,j],ACu[i,j],ap[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],ap[i,jr],conj(ARd[ir,jr]))
-        e = Array(ein"pqrs, pqrs -> "(lr,h_H))[]
-        n = Array(ein"pprr -> "(lr))[]
+        e = sum(ein"pqrs, pqrs -> "(lr,h_H))
+        n = sum(ein"pprr -> "(lr))
         params.verbosity >= 4 && println("Horizontal energy = $(e/n)")
         etol += e/n
     end

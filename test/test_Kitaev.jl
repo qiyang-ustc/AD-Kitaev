@@ -5,10 +5,11 @@ using TeneT
 
 Random.seed!(100)
 atype = Array
-D, χ = 3, 20
-No = 0
+D, χ = 4, 30
+No = 83
 S = 1//2
 model = Kitaev(S,-1.0,-1.0,-1.0)
+maxiter = 10
 if No == 0
     file = nothing
 else
@@ -18,7 +19,7 @@ h = atype.(hamiltonian(model))
 A = init_ipeps(;atype, D=D, file=file, d=Int(2*S+1))
 boundary_alg = VUMPS(ifupdown=true,
                      ifdownfromup=false, 
-                     maxiter=10, 
+                     maxiter=maxiter, 
                      miniter=1,
                      verbosity=2
 )
