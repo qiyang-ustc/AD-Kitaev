@@ -35,34 +35,50 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
     Ni, Nj = size(ap)
     oc_H, oc_V = oc
-    etol = 0
-    for j = 1:Nj, i = 1:2
-        params.verbosity >= 4 && println("===========$i,$j===========")
-        if i !== j
-            h_H = h[1]
-            h_V = h[3]
-            ir  = mod1(i + 1, Ni)
-            irr = mod1(Ni - i, Ni) 
-            lr = oc_V(ACu[i,j],FLu[i,j],ap[i,j],FRu[i,j],FLo[ir,j],ap[ir,j],FRo[ir,j],conj(ACd[irr,j]))
-            e = sum(ein"pqrs, pqrs -> "(lr,h_V))
-            n = sum(ein"pprr -> "(lr))
-            params.verbosity >= 4 && println("Vertical energy = $(e/n)")
-            etol += e/n
-        else
-            h_H = h[2]
-        end
 
-        ir = Ni + 1 - i
-        jr = mod1(j + 1, Nj)
-        lr = oc_H(FLo[i,j],ACu[i,j],ap[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],ap[i,jr],conj(ARd[ir,jr]))
-        e = sum(ein"pqrs, pqrs -> "(lr,h_H))
-        n = sum(ein"pprr -> "(lr))
-        params.verbosity >= 4 && println("Horizontal energy = $(e/n)")
-        etol += e/n
+    hx, hy, hz = h
+    Zygote.@ignore begin
+        d = size(h[1], 1)
+        Id = I(d)
+        atype = _arraytype(ACu[1])
+        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d^2,d^2)))
+        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d^2,d^2,d^2,d^2)))
+        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d^2,d^2,d^2,d^2)))
     end
 
-    params.verbosity >= 3 && println("energy = $(etol/Ni/Nj)")
-    return etol/Ni/Nj
+    etol = 0
+
+    χ, D, _ = size(ACu[1])
+    LARu = reshape(ein"adb,bec -> adec"(ARu[1,1],ARu[1,2]), (χ, D^2, χ))
+    LARd = reshape(ein"adb,bec -> adec"(ARd[1,1],ARd[1,2]), (χ, D^2, χ))
+    LACu = reshape(ein"adf,fec -> adec"(ACu[1,1],ARu[1,2]), (χ, D^2, χ))
+    LACd = reshape(ein"adf,fec -> adec"(ACd[1,1],ARd[1,2]), (χ, D^2, χ))
+
+    LFLu = reshape(ein"adb,bec -> aedc"(FLu[1,1],FLu[2,1]), (χ, D^2, χ))
+    LFRu = reshape(ein"adb,bec -> aedc"(FRu[1,2],FRu[2,2]), (χ, D^2, χ))
+    LFLo = reshape(ein"adb,bec -> aedc"(FLu[1,1],FLo[2,1]), (χ, D^2, χ))
+    LFRo = reshape(ein"adb,bec -> aedc"(FRu[1,2],FRo[2,2]), (χ, D^2, χ))
+
+    lr = oc_H(LFLo,LACu,ap[1],conj(LACd),LFRo,LARu,ap[1],conj(LARd))
+    e = sum(ein"pqrs, pqrs -> "(lr,hz))
+    n = sum(ein"pprr -> "(lr))
+    params.verbosity >= 4 && println("hz = $(e/n)")
+    etol += e/n
+
+    lr = ein"(((aeg,abc),ehfbpq),ghi),cfi -> pq"(LFLo,LACu,ap[1],conj(LACd),LFRo)
+    e = sum(ein"pq, pq -> "(lr,hx))
+    n = sum(ein"pp -> "(lr))
+    params.verbosity >= 4 && println("hx = $(e/n)")
+    etol += e/n
+
+    lr = oc_V(LACu,LFLu,ap[1],LFRu,LFLo,ap[1],LFRo,conj(LACd))
+    e = sum(ein"pqrs, pqrs -> "(lr,hy))
+    n =  sum(ein"pprr -> "(lr))
+    params.verbosity >= 4 && println("hy = $(e/n)")
+    etol += e/n
+
+    params.verbosity >= 3 && println("energy = $(etol/2)")
+    return etol/2
 end
 
 
