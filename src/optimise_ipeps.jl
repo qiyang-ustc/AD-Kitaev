@@ -35,6 +35,7 @@ function bulid_ABBA(A)
     B = permutedims(A, (3,4,1,2,5))
     ap = [(i==j ? reshape(ein"abcde,fghmn->afbgchdmen"(A, conj(A)), D^2,1,D^2,D^2, d,d) : reshape(ein"abcde,fghmn->afbgchdmen"(B, conj(B)), D^2,D^2,D^2,1, d,d)) for i in 1:2, j in 1:2]
     M = [ein"abcdee->abcd"(ap) for ap in ap]
+    # M = [(i==j ? A : B) for i in 1:2, j in 1:2]
     return ap, M
 end
 
@@ -47,10 +48,10 @@ function init_ipeps(;atype = Array, file=nothing, D::Int, d::Int)
     if file !== nothing
         A = load(file, "bcipeps")
     else
-        A = atype(rand(ComplexF64, D,1,D,D,d))
+        A = rand(ComplexF64, D,1,D,D,d)
         A /= norm(A)
     end
-    return A
+    return atype(A)
 end
 
 """
@@ -125,8 +126,7 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
         close(logfile)
     end
     if params.save_every != 0 && os.iteration % params.save_every == 0
-        
-        save(joinpath(folder, "ipeps_No.$(os.iteration).jld2"), "bcipeps", os.metadata["x"])
+        save(joinpath(folder, "ipeps_No.$(os.iteration).jld2"), "bcipeps", Array(os.metadata["x"]))
     end
 
     return false

@@ -33,6 +33,16 @@ end
 
 function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
+    # χ = size(ACu[1], 1)
+    # ACu = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), ACu)
+    # ARu = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), ARu)
+    # ACd = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), ACd)
+    # ARd = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), ARd)
+    # FLu = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FLu)
+    # FRu = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FRu)
+    # FLo = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FLo)
+    # FRo = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FRo)
+
     Ni, Nj = size(ap)
     oc_H, oc_V = oc
     etol = 0

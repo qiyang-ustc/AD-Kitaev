@@ -3,7 +3,7 @@ const σy = ComplexF64[0 -1im; 1im 0]
 const σz = ComplexF64[1 0; 0 -1]
 const id2 = ComplexF64[1 0; 0 1]
 
-function const_Sx(S::Rational)
+function const_Sx(S::Real)
     dims = Int(2*S + 1)
     ms = [-S+i-1 for i in 1:dims]
     Sx = zeros(ComplexF64, dims, dims)
@@ -15,7 +15,7 @@ function const_Sx(S::Rational)
     return Sx
 end
 
-function const_Sy(S::Rational)
+function const_Sy(S::Real)
     dims = Int(2*S + 1)
     ms = [-S+i-1 for i in 1:dims]
     Sy = zeros(ComplexF64, dims, dims)
@@ -29,7 +29,7 @@ function const_Sy(S::Rational)
     return Sy
 end
 
-function const_Sz(S::Rational)
+function const_Sz(S::Real)
     dims = Int(2*S + 1)
     ms = [S-i+1 for i in 1:dims]
     Sz = zeros(ComplexF64, dims, dims)
@@ -126,7 +126,7 @@ return a struct representing the Kitaev model with magnetisation fields
 `Jx`, `Jy` and `Jz`..
 "
 struct Kitaev <: HamiltonianModel
-    S::Rational
+    S::Real
     Jz::Real
     Jx::Real
     Jy::Real
