@@ -42,37 +42,46 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     # FRu = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FRu)
     # FLo = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FLo)
     # FRo = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), FRo)
+    hx, hy, hz = h
+    d = size(hx, 1)
+    Zygote.@ignore begin
+        Id = I(d)
+        atype = _arraytype(ACu[1])
+        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d^2,d^2)))
+        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d^2,d^2,d^2,d^2)))
+        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d^2,d^2,d^2,d^2)))
+    end
 
     Ni, Nj = size(ap)
     oc_H, oc_V = oc
     etol = 0
-    for j = 1:Nj, i = 1:2
+    for j = 1:Nj, i = 1:Ni
         params.verbosity >= 4 && println("===========$i,$j===========")
-        if i !== j
-            h_H = h[1]
-            h_V = h[3]
-            ir  = mod1(i + 1, Ni)
-            irr = mod1(Ni - i, Ni) 
-            lr = oc_V(ACu[i,j],FLu[i,j],ap[i,j],FRu[i,j],FLo[ir,j],ap[ir,j],FRo[ir,j],conj(ACd[irr,j]))
-            e = sum(ein"pqrs, pqrs -> "(lr,h_V))
-            n = sum(ein"pprr -> "(lr))
-            params.verbosity >= 4 && println("Vertical energy = $(e/n)")
-            etol += e/n
-        else
-            h_H = h[2]
-        end
-
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
         lr = oc_H(FLo[i,j],ACu[i,j],ap[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],ap[i,jr],conj(ARd[ir,jr]))
-        e = sum(ein"pqrs, pqrs -> "(lr,h_H))
+        e = sum(ein"pqrs, pqrs -> "(lr,hz))
         n = sum(ein"pprr -> "(lr))
-        params.verbosity >= 4 && println("Horizontal energy = $(e/n)")
+        params.verbosity >= 4 && println("hz = $(e/n)")
+        etol += e/n
+
+        lr = ein"(((aeg,abc),ehfbpq),ghi),cfi -> pq"(FLo[i,j],ACu[i,j],ap[i,j],conj(ACd[ir,j]),FRo[i,j])
+        e = sum(ein"pq, pq -> "(lr,hx))
+        n = sum(ein"pp -> "(lr))
+        params.verbosity >= 4 && println("hx = $(e/n)")
+        etol += e/n
+
+        ir  = mod1(i + 1, Ni)
+        irr = mod1(Ni - i, Ni) 
+        lr = oc_V(ACu[i,j],FLu[i,j],ap[i,j],FRu[i,j],FLo[ir,j],ap[ir,j],FRo[ir,j],conj(ACd[irr,j]))
+        e = sum(ein"pqrs, pqrs -> "(lr,hy))
+        n = sum(ein"pprr -> "(lr))
+        params.verbosity >= 4 && println("hy = $(e/n)")
         etol += e/n
     end
 
-    params.verbosity >= 3 && println("energy = $(etol/Ni/Nj)")
-    return etol/Ni/Nj
+    params.verbosity >= 3 && println("energy = $(etol/Ni/Nj/2)")
+    return etol/Ni/Nj/2
 end
 
 

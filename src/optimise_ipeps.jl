@@ -30,10 +30,10 @@ function indexperm_symmetrize(ipeps)
     return ipeps / norm(ipeps)
 end
 
-function bulid_ABBA(A)
+function bulid_M(A)
     D, d = size(A)[[1,5]]
-    B = permutedims(A, (3,4,1,2,5))
-    ap = [(i==j ? reshape(ein"abcde,fghmn->afbgchdmen"(A, conj(A)), D^2,1,D^2,D^2, d,d) : reshape(ein"abcde,fghmn->afbgchdmen"(B, conj(B)), D^2,D^2,D^2,1, d,d)) for i in 1:2, j in 1:2]
+    # B = permutedims(A, (3,4,1,2,5))
+    ap = [reshape(ein"abcde,fghmn->afbgchdmen"(A, conj(A)), D^2,D^2,D^2,D^2, d,d) for i in 1:1, j in 1:1]
     M = [ein"abcdee->abcd"(ap) for ap in ap]
     # M = [(i==j ? A : B) for i in 1:2, j in 1:2]
     return ap, M
@@ -48,7 +48,7 @@ function init_ipeps(;atype = Array, file=nothing, D::Int, d::Int)
     if file !== nothing
         A = load(file, "bcipeps")
     else
-        A = rand(ComplexF64, D,1,D,D,d)
+        A = rand(ComplexF64, D,D,D,D,d)
         A /= norm(A)
     end
     return atype(A)
@@ -61,7 +61,7 @@ BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 """
 function energy(A, h, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
-    ap, M = bulid_ABBA(A)
+    ap, M = bulid_M(A)
     rt′ = leading_boundary(rt, M, params.boundary_alg)
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
@@ -82,7 +82,7 @@ function optimise_ipeps(A::AbstractArray, h, χ::Int, params::iPEPSOptimize)
     oc = optcont(D, χ)
 
     # A = indexperm_symmetrize(A)
-    _, M = bulid_ABBA(A)
+    _, M = bulid_M(A)
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
 
     function f(A) 
