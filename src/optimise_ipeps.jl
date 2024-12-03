@@ -62,7 +62,15 @@ BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 function energy(A, h, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
     ap, M = bulid_M(A)
-    rt′ = leading_boundary(rt, M, params.boundary_alg)
+
+    params.verbosity >= 4 && println("for convergence") 
+    Zygote.@ignore update!(rt, leading_boundary(rt, M, params.boundary_alg))
+
+    params.verbosity >= 4 && println("real AD calculation")
+    params_diff = deepcopy(params)
+    params_diff.boundary_alg.maxiter = 10
+    rt′ = leading_boundary(rt, M, params_diff.boundary_alg)
+
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
     return expectation_value(h, ap, env, oc, params)
@@ -126,7 +134,7 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
         close(logfile)
     end
     if params.save_every != 0 && os.iteration % params.save_every == 0
-        save(joinpath(folder, "ipeps_No.$(os.iteration).jld2"), "bcipeps", Array(os.metadata["x"]))
+        save(joinpath(folder, "ipeps", "ipeps_No.$(os.iteration).jld2"), "bcipeps", Array(os.metadata["x"]))
     end
 
     return false
