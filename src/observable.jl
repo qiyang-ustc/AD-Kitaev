@@ -20,20 +20,21 @@ function optcont(D::Int, χ::Int)
     seed = 60
 	Random.seed!(seed)
 	# oc_H = optimize_code(ein"agj,abc,gkhbpq,jkl,fio,cef,hniers,lno -> pqrs", sd, TreeSA())
-    oc_H = ein"(((agj,abc),gkhbpq),jkl),(((fio,cef),hniers),lno) -> pqrs"
-	print("Horizontal Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_H,sd),"\n")
+    # oc_H = ein"(((agj,abc),gkhbpq),jkl),(((fio,cef),hniers),lno) -> pqrs"
+    oc_H = ein"((((((((((((((abc,ajn),nru),rvsbβ),uvw),cde),jkldγ),wkx),efg),sytfη),xyz),ghi),lpmhδ),zpα),imq),qtα -> γβδη"
+	# print("Horizontal Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_H,sd),"\n")
     
     sd = Dict('a' => χ, 'b' => D^2, 'c' => χ, 'e' => D^2, 'f' => D^2, 'g' => χ, 'h' => D^2, 'i' => χ, 'j' => D^2, 'k' => D^2, 'l' => χ, 'm' => D^2, 'n' => χ, 'r' => 2, 's' => 2, 'p' => 2, 'q' => 2)
     # oc_V = optimize_code(ein"abc,aeg,ehfbpq,cfi,gjl,jmkhrs,ikn,lmn -> pqrs", sd, TreeSA())
-    oc_V = ein"(((abc,aeg),ehfbpq),cfi),(gjl,(jmkhrs,(ikn,lmn))) -> pqrs"
-    print("Vertical Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_V,sd),"\n") 
+    # oc_V = ein"(((abc,aeg),ehfbpq),cfi),(gjl,(jmkhrs,(ikn,lmn))) -> pqrs"
+    oc_V = ein"((((((((((((((ajn,abc),nru),bsvrβ),uvw),cde),dlkjγ),wkx),efg),ftysη),xyz),ghi),hmplδ),zpα),imq),qtα -> βγηδ"
+    # print("Vertical Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_V,sd),"\n") 
     oc_H, oc_V
 end
 
 
-function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
+function expectation_value(h, A, env, oc, params::iPEPSOptimize)
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
-    Ni, Nj = size(ap)
     oc_H, oc_V = oc
 
     hx, hy, hz = h
@@ -49,29 +50,31 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     etol = 0
 
     χ, D, _ = size(ACu[1])
-    LARu = reshape(ein"adb,bec -> adec"(ARu[1,1],ARu[1,2]), (χ, D^2, χ))
-    LARd = reshape(ein"adb,bec -> adec"(ARd[1,1],ARd[1,2]), (χ, D^2, χ))
-    LACu = reshape(ein"adf,fec -> adec"(ACu[1,1],ARu[1,2]), (χ, D^2, χ))
-    LACd = reshape(ein"adf,fec -> adec"(ACd[1,1],ARd[1,2]), (χ, D^2, χ))
+    # LARu = reshape(ein"adb,bec -> adec"(ARu[1,1],ARu[1,2]), (χ, D^2, χ))
+    # LARd = reshape(ein"adb,bec -> adec"(ARd[1,1],ARd[1,2]), (χ, D^2, χ))
+    # LACu = reshape(ein"adf,fec -> adec"(ACu[1,1],ARu[1,2]), (χ, D^2, χ))
+    # LACd = reshape(ein"adf,fec -> adec"(ACd[1,1],ARd[1,2]), (χ, D^2, χ))
 
-    LFLu = reshape(ein"adb,bec -> aedc"(FLu[1,1],FLu[2,1]), (χ, D^2, χ))
-    LFRu = reshape(ein"adb,bec -> aedc"(FRu[1,2],FRu[2,2]), (χ, D^2, χ))
-    LFLo = reshape(ein"adb,bec -> aedc"(FLu[1,1],FLo[2,1]), (χ, D^2, χ))
-    LFRo = reshape(ein"adb,bec -> aedc"(FRu[1,2],FRo[2,2]), (χ, D^2, χ))
+    # LFLu = reshape(ein"adb,bec -> aedc"(FLu[1,1],FLu[2,1]), (χ, D^2, χ))
+    # LFRu = reshape(ein"adb,bec -> aedc"(FRu[1,2],FRu[2,2]), (χ, D^2, χ))
+    # LFLo = reshape(ein"adb,bec -> aedc"(FLu[1,1],FLo[2,1]), (χ, D^2, χ))
+    # LFRo = reshape(ein"adb,bec -> aedc"(FRu[1,2],FRo[2,2]), (χ, D^2, χ))
 
-    lr = oc_H(LFLo,LACu,ap[1],conj(LACd),LFRo,LARu,ap[1],conj(LARd))
+    lr = oc_H(ACu[1,1],FLu[1,1],FLo[2,1],A,conj(ACd[1,1]),ARu[1,2],conj(A),conj(ARd[1,2]),
+              ARu[1,1],A,conj(ARd[1,1]),ARu[1,2],conj(A),conj(ARd[1,2]),FRu[1,2],FRo[2,2])
     e = sum(ein"pqrs, pqrs -> "(lr,hz))
     n = sum(ein"pprr -> "(lr))
     params.verbosity >= 4 && println("hz = $(e/n)")
     etol += e/n
 
-    lr = ein"(((aeg,abc),ehfbpq),ghi),cfi -> pq"(LFLo,LACu,ap[1],conj(LACd),LFRo)
+    lr = ein"((((((((abc,ajn),nru),rvsbβ),uvw),cde),jkldγ),wkx),elf),fsx->βγ"(ACu[1,1],FLu[1,1],FLo[2,1],A,conj(ACd[1,1]),ARu[1,2],conj(A),conj(ARd[1,2]),FRu[1,2],FRo[2,2])
     e = sum(ein"pq, pq -> "(lr,hx))
     n = sum(ein"pp -> "(lr))
     params.verbosity >= 4 && println("hx = $(e/n)")
     etol += e/n
 
-    lr = oc_V(LACu,LFLu,ap[1],LFRu,LFLo,ap[1],LFRo,conj(LACd))
+    lr = oc_V(ACu[1,1],FLu[1,1],ARu[1,2],conj(A),FRu[1,2],FLu[2,1],A,FRu[2,2],
+              FLu[1,1],conj(A),FRu[1,2],FLo[2,1],A,FRo[2,2],conj(ACd[1,1]),conj(ARd[1,2]))
     e = sum(ein"pqrs, pqrs -> "(lr,hy))
     n =  sum(ein"pprr -> "(lr))
     params.verbosity >= 4 && println("hy = $(e/n)")

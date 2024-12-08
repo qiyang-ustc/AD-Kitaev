@@ -33,17 +33,17 @@ end
 """
    │     │                 a     b 
 ───┼─────┼───           c ─┼─ d ─┼─ e
-   │   ╱ │                 │ ╲   │
+   │   ╱ │                 │   ╱ │
    │  ╱  │                 f  m  g 
-   │ ╱   │                 │   ╲ │
+   │ ╱   │                 │ ╱   │
 ───┼─────┼───           h ─┼─ i ─┼─ j
    │     │                 k     l
 """
 function build_M(A)
     atype = _arraytype(A)
     D, d = size(A)[[1,5]]
-    ID = Matrix{Float64}(I, D, D)
-    Id = Matrix{Float64}(I, d, d)
+    ID = Matrix{ComplexF64}(I, D, D)
+    Id = Matrix{ComplexF64}(I, d, d)
     M11 = ein"ae, bf, cd -> abcdef"(ID, ID, Id)
     M11 = reshape(M11, D, D*d, D*d, D)
     M12 = permutedims(conj(A), (5,1,2,3,4))
@@ -51,8 +51,7 @@ function build_M(A)
     M21 = reshape(A, D, D, D, D*d)
     M22 = ein"ac, bd -> abcd"(ID, ID)
     M = reshape([atype(M11), atype(M21), atype(M12), atype(M22)], 2,2)
-    ap = [reshape(ein"abcde,fghmn->afbgchdmen"(A, conj(A)), D^2,D^2,D^2,D^2, d,d) for i in 1:1, j in 1:1]
-    return ap, M
+    return M
 end
 
 function bulid_ABBA(A)
@@ -85,11 +84,11 @@ BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 """
 function energy(A, h, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
-    ap, M = build_M(A)
+    M = build_M(A)
     rt′ = leading_boundary(rt, M, params.boundary_alg)
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
-    return expectation_value(h, ap, env, oc, params)
+    return expectation_value(h, A, env, oc, params)
 end
 
 """
@@ -106,7 +105,7 @@ function optimise_ipeps(A::AbstractArray, h, χ::Int, params::iPEPSOptimize)
     oc = optcont(D, χ)
 
     # A = indexperm_symmetrize(A)
-    _, M = build_M(A)
+    M = build_M(A)
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
 
     function f(A) 
@@ -150,8 +149,7 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
         close(logfile)
     end
     if params.save_every != 0 && os.iteration % params.save_every == 0
-        
-        save(joinpath(folder, "ipeps_No.$(os.iteration).jld2"), "bcipeps", os.metadata["x"])
+        save(joinpath(folder, "ipeps", "ipeps_No.$(os.iteration).jld2"), "bcipeps", os.metadata["x"])
     end
 
     return false
