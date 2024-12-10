@@ -46,7 +46,7 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     Ni, Nj = size(ap)
     oc_H, oc_V = oc
     etol = 0
-    for j = 1:Nj, i = 1:2
+    for j = 1:Nj, i = 1:1
         params.verbosity >= 4 && println("===========$i,$j===========")
         if i !== j
             h_H = h[1]
@@ -72,7 +72,7 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     end
 
     params.verbosity >= 3 && println("energy = $(etol/Ni/Nj)")
-    return etol/Ni/Nj
+    return etol/Ni/Nj*2
 end
 
 

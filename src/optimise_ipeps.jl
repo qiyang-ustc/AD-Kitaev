@@ -44,12 +44,26 @@ end
 
 return a random `ipeps` with bond dimension `D` and physical dimension 2.
 """
-function init_ipeps(;atype = Array, file=nothing, D::Int, d::Int)
+function init_ipeps(;atype = Array, file=nothing, D::Int, d::Int, χ::Int, params)
     if file !== nothing
         A = load(file, "bcipeps")
     else
         A = rand(ComplexF64, D,1,D,D,d)
         A /= norm(A)
+        _, M = bulid_ABBA(A)
+        rt = VUMPSRuntime(M, χ, params.boundary_alg)
+        rt′ = leading_boundary(rt, M, params.boundary_alg)
+        Zygote.@ignore params.reuse_env && update!(rt, rt′)
+        n = 1
+        Zygote.@ignore begin
+            env = VUMPSEnv(rt′, M)
+            @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
+            # n, _ = rightenv(ARu, conj(ARd), M, FLo; ifobs=true) 
+            λFLo, _ =  rightenv(ARu, conj.(ARd), M; ifobs=true)
+            λC, _ = rightCenv(ARu, conj.(ARd);    ifobs=true)
+            n = prod(λFLo./λC)
+        end
+        A /= sqrt(n)
     end
     return atype(A)
 end
@@ -62,6 +76,24 @@ BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 function energy(A, h, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
     ap, M = bulid_ABBA(A)
+    rt′ = leading_boundary(rt, M, params.boundary_alg)
+    Zygote.@ignore params.reuse_env && update!(rt, rt′)
+    # n = 1
+    # Zygote.@ignore begin
+    #     env = VUMPSEnv(rt′, M)
+    #     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
+    #     # n, _ = rightenv(ARu, conj(ARd), M, FLo; ifobs=true) 
+    #     λFLo, _ =  rightenv(ARu, conj.(ARu), M; ifobs=true)
+    #     λC, _   = rightCenv(ARu, conj.(ARd);    ifobs=true)
+    #     n = prod(λFLo./λC)
+    #     @show n
+    #     M /= 2
+    #     λFLo, _ =  rightenv(ARu, conj.(ARu), M; ifobs=true)
+    #     λC, _   = rightCenv(ARu, conj.(ARd);    ifobs=true)
+    #     n = prod(λFLo./λC)
+    #     @show n
+    # end
+
     rt′ = leading_boundary(rt, M, params.boundary_alg)
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
@@ -126,7 +158,7 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
         close(logfile)
     end
     if params.save_every != 0 && os.iteration % params.save_every == 0
-        save(joinpath(folder, "ipeps_No.$(os.iteration).jld2"), "bcipeps", Array(os.metadata["x"]))
+        save(joinpath(folder, "ipeps", "ipeps_No.$(os.iteration).jld2"), "bcipeps", Array(os.metadata["x"]))
     end
 
     return false

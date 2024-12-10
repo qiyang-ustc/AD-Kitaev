@@ -11,8 +11,9 @@ using Printf
 using Parameters
 using Zygote
 using TeneT
+using CUDA
 
-using TeneT: ALCtoAC, _arraytype, update!
+using TeneT: ALCtoAC, _arraytype, update!, rightenv, rightCenv
 
 export Heisenberg
 export hamiltonian
