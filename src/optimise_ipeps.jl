@@ -31,9 +31,8 @@ function indexperm_symmetrize(ipeps)
 end
 
 function bulid_M(A)
-    D, d = size(A)[[1,5]]
-    # B = permutedims(A, (3,4,1,2,5))
-    ap = [reshape(ein"abcde,fghmn->afbgchdmen"(A, conj(A)), D^2,D^2,D^2,D^2, d,d) for i in 1:1, j in 1:1]
+    D, d, Ni, Nj = size(A)[[1,5,6,7]]
+    ap = [reshape(ein"abcde,fghmn->afbgchdmen"(A[:,:,:,:,:,i,j], conj(A[:,:,:,:,:,i,j])), D^2,D^2,D^2,D^2, d,d) for i in 1:Ni, j in 1:Nj]
     M = [ein"abcdee->abcd"(ap) for ap in ap]
     # M = [(i==j ? A : B) for i in 1:2, j in 1:2]
     return ap, M
@@ -44,11 +43,11 @@ end
 
 return a random `ipeps` with bond dimension `D` and physical dimension 2.
 """
-function init_ipeps(;atype = Array, file=nothing, D::Int, d::Int)
+function init_ipeps(;atype = Array, file=nothing, D::Int, d::Int, Ni::Int, Nj::Int)
     if file !== nothing
         A = load(file, "bcipeps")
     else
-        A = rand(ComplexF64, D,D,D,D,d)
+        A = rand(ComplexF64, D,D,D,D,d,Ni,Nj)
         A /= norm(A)
     end
     return atype(A)
@@ -61,6 +60,7 @@ BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 """
 function energy(A, h, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
+    A /= norm(A)
     ap, M = bulid_M(A)
 
     params.verbosity >= 4 && println("for convergence") 
