@@ -20,18 +20,18 @@ function optcont(D::Int, χ::Int)
     seed = 60
 	Random.seed!(seed)
 	# oc_H = optimize_code(ein"agj,abc,gkhbpq,jkl,fio,cef,hniers,lno -> pqrs", sd, TreeSA())
-    oc_H = ein"(((agj,abc),gkhbpq),jkl),(((fio,cef),hniers),lno) -> pqrs"
+    oc_H = ein"(((agj,abc),gkhb),jkl),(((fio,cef),hnie),lno) -> "
 	print("Horizontal Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_H,sd),"\n")
     
     sd = Dict('a' => χ, 'b' => D^2, 'c' => χ, 'e' => D^2, 'f' => D^2, 'g' => χ, 'h' => D^2, 'i' => χ, 'j' => D^2, 'k' => D^2, 'l' => χ, 'm' => D^2, 'n' => χ, 'r' => 2, 's' => 2, 'p' => 2, 'q' => 2)
     # oc_V = optimize_code(ein"abc,aeg,ehfbpq,cfi,gjl,jmkhrs,ikn,lmn -> pqrs", sd, TreeSA())
-    oc_V = ein"(((abc,aeg),ehfbpq),cfi),(gjl,(jmkhrs,(ikn,lmn))) -> pqrs"
+    oc_V = ein"(((abc,aeg),ehfb),cfi),(gjl,(jmkh,(ikn,lmn))) -> "
     print("Vertical Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_V,sd),"\n") 
     oc_H, oc_V
 end
 
 
-function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
+function expectation_value(h, ap, M, env, oc, params::iPEPSOptimize)
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
     # χ = size(ACu[1], 1)
     # ACu = map(j->reshape(j, (χ, Int(prod(size(j))/χ/χ), χ)), ACu)
@@ -46,16 +46,21 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
     Ni, Nj = size(ap)
     oc_H, oc_V = oc
     etol = 0
-    for j = 1:Nj, i = 1:1
+    for j = 1:Nj, i = 1:Ni
         params.verbosity >= 4 && println("===========$i,$j===========")
-        if i !== j
+        if (i + j) % 2 == 0
             h_H = h[1]
             h_V = h[3]
             ir  = mod1(i + 1, Ni)
             irr = mod1(Ni - i, Ni) 
-            lr = oc_V(ACu[i,j],FLu[i,j],ap[i,j],FRu[i,j],FLo[ir,j],ap[ir,j],FRo[ir,j],conj(ACd[irr,j]))
-            e = sum(ein"pqrs, pqrs -> "(lr,h_V))
-            n = sum(ein"pprr -> "(lr))
+            e = 0
+            for p in 1:d, q in 1:d, r in 1:d, s in 1:d
+                if h_V[p,q,r,s] != 0
+                    e += sum(oc_V(ACu[i,j],FLu[i,j],ap[i,j][:,:,:,:,p,q],FRu[i,j],FLo[ir,j],ap[ir,j][:,:,:,:,r,s],FRo[ir,j],conj(ACd[irr,j]))) * h_V[p,q,r,s]
+                end
+            end
+            # e = sum(ein"pqrs, pqrs -> "(lr,h_V))
+            n = sum(oc_V(ACu[i,j],FLu[i,j],M[i,j],FRu[i,j],FLo[ir,j],M[ir,j],FRo[ir,j],conj(ACd[irr,j])))
             params.verbosity >= 4 && println("Vertical energy = $(e/n)")
             etol += e/n
         else
@@ -64,15 +69,19 @@ function expectation_value(h, ap, env, oc, params::iPEPSOptimize)
 
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
-        lr = oc_H(FLo[i,j],ACu[i,j],ap[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],ap[i,jr],conj(ARd[ir,jr]))
-        e = sum(ein"pqrs, pqrs -> "(lr,h_H))
-        n = sum(ein"pprr -> "(lr))
+        e = 0
+        for p in 1:d, q in 1:d, r in 1:d, s in 1:d
+            if h_H[p,q,r,s] != 0
+                e += sum(oc_H(FLo[i,j],ACu[i,j],ap[i,j][:,:,:,:,p,q],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],ap[i,jr][:,:,:,:,r,s],conj(ARd[ir,jr]))) * h_H[p,q,r,s]
+            end
+        end
+        n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
         params.verbosity >= 4 && println("Horizontal energy = $(e/n)")
         etol += e/n
     end
 
     params.verbosity >= 3 && println("energy = $(etol/Ni/Nj)")
-    return etol/Ni/Nj*2
+    return etol/Ni/Nj
 end
 
 
