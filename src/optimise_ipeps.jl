@@ -73,7 +73,7 @@ function energy(A, h, rt, oc, params::iPEPSOptimize)
 
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
-    return expectation_value(h, ap, env, oc, params)
+    return expectation_value(h, ap, M, env, oc, params)
 end
 
 """

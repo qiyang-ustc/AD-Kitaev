@@ -19,6 +19,7 @@ h = hamiltonian(model)
 A = init_ipeps(;atype, D=D, file=file, d=Int(2*S+1)^2)
 boundary_alg = VUMPS(ifupdown=true,
                      ifdownfromup=false, 
+                     ifsimple_eig=false,
                      maxiter=maxiter, 
                      miniter=3,
                      verbosity=2
@@ -26,7 +27,7 @@ boundary_alg = VUMPS(ifupdown=true,
 params = iPEPSOptimize(boundary_alg=boundary_alg, 
                        reuse_env=true, 
                        verbosity=4, 
-                       maxiter=10,
+                       maxiter=100,
                        tol=1e-10,
                        folder="data/merge/$model/"
 )
