@@ -32,7 +32,7 @@ function energy(h, bulk, oc, key; savefile = true, show_every = Inf)
     a = copy(a)
 
     env = obs_env(a; updown = true, χ = χ, tol = tol, maxiter = maxiter, miniter = miniter, verbose = verbose, savefile = savefile, infolder = folder, outfolder = folder, savetol = 1e-3, show_every = show_every)
-    e = ifcheckpoint ? checkpoint(expectationvalue, h, ap, env, oc, key) : expectationvalue(h, ap, env, oc, key)
+    e = ifcheckpoint ? checkpoint(expectationvalue, bulk, a, env, oc, key) : expectationvalue(bulk, a, env, oc, key)
     return e
 end
 
@@ -54,12 +54,17 @@ where the central two block are six order tensor have extra bond `pq` and `rs`
 """
 function optcont(D::Int, χ::Int, d::Int)
     sd = Dict('a' => χ, 'b' => D^2,'c' => χ, 'e' => D^2, 'f' => χ, 'g' => D^2, 'h' => D^2, 'i' => D^2, 'j' => χ, 'k' => D^2, 'l' => χ, 'n' => D^2, 'o' => χ, 'p' => d, 'q' => d, 'r' => d, 's' => d)
-    oc1 = optimize_greedy(ein"agj,abc,gkhbpq,jkl,fio,cef,hniers,lno -> pqrs", sd; method=MinSpaceDiff())
+    oc1 = optimize_greedy(ein"agj,abc,gkhb,jkl,fio,cef,hnie,lno -> ", sd; method=MinSpaceDiff())
     sd = Dict('a' => χ, 'b' => D^2, 'c' => χ, 'e' => D^2, 'f' => D^2, 'g' => χ, 'h' => D^2, 'i' => χ, 'j' => D^2, 'k' => D^2, 'l' => χ, 'm' => D^2, 'n' => χ, 'r' => d, 's' => d, 'p' => d, 'q' => d)
-    oc2 = optimize_greedy(ein"abc,aeg,ehfbpq,cfi,gjl,jmkhrs,ikn,lmn -> pqrs", sd; method=MinSpaceDiff())
+    oc2 = optimize_greedy(ein"abc,aeg,ehfb,cfi,gjl,jmkh,ikn,lmn -> ", sd; method=MinSpaceDiff())
     oc1, oc2
 end
 
+
+function bulid_Mp(A, O)
+    D = size(A, 1)
+    return reshape(ein"(abcde,en),fghmn->afbgchdm"(A, O, conj(A)), D^2, D^2, D^2, D^2)
+end
 
 """
     expectationvalue(h, ap, env)
@@ -68,45 +73,59 @@ return the expectationvalue of a two-site operator `h` with the sites
 described by rank-6 tensor `ap` each and an environment described by
 a `SquareBCVUMPSRuntime` `env`.
 """
-function expectationvalue(h, ap, env, oc, key)
+function expectationvalue(A, M, env, oc, key)
     _, ALu, Cu, ARu, ALd, Cd, ARd, FL, FR, FLu, FRu = env
     _, model, field, atype, Ni, Nj, _, _, _, _, _, _, verbose = key
-    d = Int(2*model.S + 1) ^ 2
-    oc1, oc2 = oc
+    oc_H, oc_V = oc
     ACu = ALCtoAC(ALu, Cu)
     ACd = ALCtoAC(ALd, Cd)
-    hx, hy, hz = h
-    ap /= norm(ap)
-    etol = 0
-    Zygote.@ignore begin
-        hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d,d)))
-        hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(Int(sqrt(d))), hy, I(Int(sqrt(d)))), (d,d,d,d)))
-        hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(Int(sqrt(d))), hz, I(Int(sqrt(d)))), (d,d,d,d)))
-    end
+    # hx, hy, hz = h
+    # ap /= norm(ap)
+    # etol = 0
+    # Zygote.@ignore begin
+    #     hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d,d)))
+    #     hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(Int(sqrt(d))), hy, I(Int(sqrt(d)))), (d,d,d,d)))
+    #     hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(I(Int(sqrt(d))), hz, I(Int(sqrt(d)))), (d,d,d,d)))
+    # end
+    S = model.S
+    d = Int(2*S + 1)
+    Sx = Zygote.@ignore const_Sx(S)
+    Sy = Zygote.@ignore const_Sy(S)
+    Sz = Zygote.@ignore const_Sz(S)
 
+    etol = 0
     for j = 1:Nj, i = 1:Ni
         verbose && println("===========$i,$j===========")
         ir = Ni + 1 - i
-        jr = j + 1 - (j==Nj) * Nj
-        lr = oc1(FL[:,:,:,i,j],ACu[:,:,:,i,j],ap[i,j],ACd[:,:,:,ir,j],FR[:,:,:,i,jr],ARu[:,:,:,i,jr],ap[i,jr],ARd[:,:,:,ir,jr])
-        e = Array(ein"pqrs, pqrs -> "(lr,hz))[]
-        n = Array(ein"pprr -> "(lr))[]
+        jr = mod1(j + 1, Nj)
+        Mp1 = bulid_Mp( A[i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)))
+        Mp2 = bulid_Mp(A[i,jr], atype(reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)))
+        e = sum(oc_H(FL[:,:,:,i,j],ACu[:,:,:,i,j],Mp1,ACd[:,:,:,ir,j],FR[:,:,:,i,jr],ARu[:,:,:,i,jr],Mp2,ARd[:,:,:,ir,jr]))
+        n = sum(oc_H(FL[:,:,:,i,j],ACu[:,:,:,i,j],M[:,:,:,:,i,j],ACd[:,:,:,ir,j],FR[:,:,:,i,jr],ARu[:,:,:,i,jr],M[:,:,:,:,i,jr],ARd[:,:,:,ir,jr]))
+        # e = sum(ein"pqrs, pqrs -> "(lr,hz))
+        # n = sum(ein"pprr -> "(lr))
+
         verbose && println("hz = $(e/n)")
-        etol += e/n
+        etol -= e/n
 
-        lr = ein"(((aeg,abc),ehfbpq),ghi),cfi -> pq"(FL[:,:,:,i,j],ACu[:,:,:,i,j],ap[i,j],ACd[:,:,:,ir,j],FR[:,:,:,i,j])
-        e = Array(ein"pq, pq -> "(lr,hx))[]
-        n = Array(ein"pp -> "(lr))[]
+        Mp = bulid_Mp(A[i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
+        e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FL[:,:,:,i,j],ACu[:,:,:,i,j],Mp,ACd[:,:,:,ir,j],FR[:,:,:,i,j]))
+        n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FL[:,:,:,i,j],ACu[:,:,:,i,j],M[:,:,:,:,i,j],ACd[:,:,:,ir,j],FR[:,:,:,i,j]))
+        # e = sum(ein"pq, pq -> "(lr,hx))
+        # n = sum(ein"pp -> "(lr))
         verbose && println("hx = $(e/n)")
-        etol += e/n
+        etol -= e/n
 
-        ir  =  i + 1 - (i==Ni) * Ni
-        irr = Ni - i + (i==Ni) * Ni
-        lr = oc2(ACu[:,:,:,i,j],FLu[:,:,:,i,j],ap[i,j],FRu[:,:,:,i,j],FL[:,:,:,ir,j],ap[ir,j],FR[:,:,:,ir,j],ACd[:,:,:,irr,j])
-        e = Array(ein"pqrs, pqrs -> "(lr,hy))[]
-        n =  Array(ein"pprr -> "(lr))[]
+        ir  = mod1(i + 1, Ni)
+        irr = mod1(Ni - i, Ni) 
+        Mp1 = bulid_Mp( A[i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)))
+        Mp2 = bulid_Mp(A[ir,j], atype(reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)))
+        e = sum(oc_V(ACu[:,:,:,i,j],FLu[:,:,:,i,j],Mp1,FRu[:,:,:,i,j],FL[:,:,:,ir,j],Mp2,FR[:,:,:,ir,j],ACd[:,:,:,irr,j]))
+        n = sum(oc_V(ACu[:,:,:,i,j],FLu[:,:,:,i,j],M[:,:,:,:,i,j],FRu[:,:,:,i,j],FL[:,:,:,ir,j],M[:,:,:,:,ir,j],FR[:,:,:,ir,j],ACd[:,:,:,irr,j]))
+        # e = sum(ein"pqrs, pqrs -> "(lr,hy))
+        # n = sum(ein"pprr -> "(lr))
         verbose && println("hy = $(e/n)")
-        etol += e/n
+        etol -= e/n
     end
     
     if field != 0.0
@@ -140,8 +159,8 @@ function expectationvalue(h, ap, env, oc, key)
         end
     end
 
-    verbose && println("e = $(etol/Ni/Nj)")
-    return etol/Ni/Nj
+    verbose && println("e = $(etol/Ni/Nj/2)")
+    return etol/Ni/Nj/2
 end
 
 """
@@ -181,9 +200,9 @@ end
 
 function buildbcipeps(bulk, S, Ni, Nj)
     bulk /= norm(bulk)
-    atype = _arraytype(bulk)
-    QQ = Zygote.@ignore atype(bulid_QQ(S))
-    bulk = constrain(bulk, QQ)
+    # atype = _arraytype(bulk)
+    # QQ = Zygote.@ignore atype(bulid_QQ(S))
+    # bulk = constrain(bulk, QQ)
     reshape([bulk[:,:,:,:,:,i] for i = 1:Ni*Nj], (Ni, Nj))
 end
 
@@ -216,7 +235,7 @@ function init_ipeps(model::HamiltonianModel,
         field = field * fdirection / norm(fdirection)
     end
     mkpath(folder)
-    chkp_file = folder*"D$(D*2)_chi$(χ)_tol$(tol)_maxiter$(maxiter)_miniter$(miniter).jld2"
+    chkp_file = folder*"D$(D)_chi$(χ)_tol$(tol)_maxiter$(maxiter)_miniter$(miniter).jld2"
     if isfile(chkp_file)
         bulk = load(chkp_file)["bcipeps"]
         verbose && println("load BCiPEPS from $chkp_file")
@@ -226,7 +245,7 @@ function init_ipeps(model::HamiltonianModel,
         verbose && println("random initial BCiPEPS $chkp_file")
     end
     bulk /= norm(bulk)
-    key = (folder, model, field, atype, Ni, Nj, D*2, χ, tol, maxiter, miniter, ifcheckpoint, verbose)
+    key = (folder, model, field, atype, Ni, Nj, D, χ, tol, maxiter, miniter, ifcheckpoint, verbose)
     return bulk, key
 end
 
