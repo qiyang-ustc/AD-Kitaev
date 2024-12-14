@@ -32,10 +32,9 @@ end
 
 function bulid_M(A)
     D, d, Ni, Nj = size(A)[[1,5,6,7]]
-    ap = [reshape(ein"abcde,fghmn->afbgchdmen"(A[:,:,:,:,:,i,j], conj(A[:,:,:,:,:,i,j])), D^2,D^2,D^2,D^2, d,d) for i in 1:Ni, j in 1:Nj]
-    M = [ein"abcdee->abcd"(ap) for ap in ap]
+    M = [reshape(ein"abcde,fghme->afbgchdm"(A[:,:,:,:,:,i,j], conj(A[:,:,:,:,:,i,j])), D^2,D^2,D^2,D^2) for i in 1:Ni, j in 1:Nj]
     # M = [(i==j ? A : B) for i in 1:2, j in 1:2]
-    return ap, M
+    return M
 end
 
 """
@@ -58,10 +57,10 @@ end
 return the energy of the `bcipeps` 2-site hamiltonian `h` and calculated via a
 BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 """
-function energy(A, h, rt, oc, params::iPEPSOptimize)
+function energy(A, model, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
     A /= norm(A)
-    ap, M = bulid_M(A)
+    M = bulid_M(A)
 
     params.verbosity >= 4 && println("for convergence") 
     Zygote.@ignore update!(rt, leading_boundary(rt, M, params.boundary_alg))
@@ -73,7 +72,7 @@ function energy(A, h, rt, oc, params::iPEPSOptimize)
 
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
-    return expectation_value(h, ap, M, env, oc, params)
+    return expectation_value(model, A, M, env, oc, params)
 end
 
 """
@@ -85,16 +84,16 @@ two-site hamiltonian `h`. The minimization is done using `Optim` with default-me
 providing `optimmethod`. Other options to optim can be passed with `optimargs`.
 The energy is calculated using vumps with key include parameters `χ`, `tol` and `maxiter`.
 """
-function optimise_ipeps(A::AbstractArray, h, χ::Int, params::iPEPSOptimize)
+function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize)
     D = size(A, 1)
     oc = optcont(D, χ)
 
     # A = indexperm_symmetrize(A)
-    _, M = bulid_M(A)
+    M = bulid_M(A)
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
 
     function f(A) 
-        return real(energy(A, h, rt, oc, params))
+        return real(energy(A, model, rt, oc, params))
     end
     function g(A)
         # f(x)

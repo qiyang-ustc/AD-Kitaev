@@ -30,56 +30,64 @@ function optcont(D::Int, χ::Int)
     oc_H, oc_V
 end
 
+function bulid_Mp(A, O)
+    D = size(A, 1)
+    return reshape(ein"(abcde,en),fghmn->afbgchdm"(A, O, conj(A)), D^2, D^2, D^2, D^2)
+end
 
-function expectation_value(h, ap, M, env, oc, params::iPEPSOptimize)
+function expectation_value(model, A, M, env, oc, params::iPEPSOptimize)
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
-    hx, hy, hz = h
-    d = size(hx, 1)^2
-    Zygote.@ignore begin
-        Id = I(Int(sqrt(d)))
-        hx = reshape(permutedims(hx, (1,3,2,4)), (d,d))
-        hy = reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d,d,d,d))
-        hz = reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d,d,d,d))
-    end
-    
-    Ni, Nj = size(ap)
+    # hx, hy, hz = h
+    # d = size(hx, 1)
+    # Zygote.@ignore begin
+    #     Id = I(d)
+    #     atype = _arraytype(ACu[1])
+    #     hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d^2,d^2)))
+    #     hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d^2,d^2,d^2,d^2)))
+    #     hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d^2,d^2,d^2,d^2)))
+    # end
+    atype = _arraytype(ACu[1])
+    S = model.S
+    d = Int(2*S + 1)
+    Sx = Zygote.@ignore const_Sx(S)
+    Sy = Zygote.@ignore const_Sy(S)
+    Sz = Zygote.@ignore const_Sz(S)
+
+    Ni, Nj = size(ACu)
     oc_H, oc_V = oc
     etol = 0
     for j = 1:Nj, i = 1:Ni
         params.verbosity >= 4 && println("===========$i,$j===========")
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
-        e = 0
-        for p in 1:d, q in 1:d, r in 1:d, s in 1:d
-            if hz[p,q,r,s] != 0
-                e += sum(oc_H(FLo[i,j],ACu[i,j],ap[i,j][:,:,:,:,p,q],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],ap[i,jr][:,:,:,:,r,s],conj(ARd[ir,jr]))) * hz[p,q,r,s]
-            end
-        end
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)))
+        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)))
+        e = sum(oc_H(FLo[i,j],ACu[i,j],Mp1,conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],Mp2,conj(ARd[ir,jr])))
         n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
-        params.verbosity >= 4 && println("hz = $(e/n)")
-        etol += e/n
+        # e = sum(ein"pqrs, pqrs -> "(lr,hz))
+        # n = sum(ein"pprr -> "(lr))
 
-        e = 0 
-        for p in 1:d, q in 1:d
-            if hx[p,q] != 0
-                e += sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],ap[i,j][:,:,:,:,p,q],conj(ACd[ir,j]),FRo[i,j])) * hx[p,q]
-            end
-        end
+        params.verbosity >= 4 && println("hz = $(e/n)")
+        etol -= e/n
+
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
+        e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
+        # e = sum(ein"pq, pq -> "(lr,hx))
+        # n = sum(ein"pp -> "(lr))
         params.verbosity >= 4 && println("hx = $(e/n)")
-        etol += e/n
+        etol -= e/n
 
         ir  = mod1(i + 1, Ni)
         irr = mod1(Ni - i, Ni) 
-        e = 0
-        for p in 1:d, q in 1:d, r in 1:d, s in 1:d
-            if hy[p,q,r,s] != 0
-                e += sum(oc_V(ACu[i,j],FLu[i,j],ap[i,j][:,:,:,:,p,q],FRu[i,j],FLo[ir,j],ap[ir,j][:,:,:,:,r,s],FRo[ir,j],conj(ACd[irr,j]))) * hy[p,q,r,s]
-            end
-        end
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)))
+        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)))
+        e = sum(oc_V(ACu[i,j],FLu[i,j],Mp1,FRu[i,j],FLo[ir,j],Mp2,FRo[ir,j],conj(ACd[irr,j])))
         n = sum(oc_V(ACu[i,j],FLu[i,j],M[i,j],FRu[i,j],FLo[ir,j],M[ir,j],FRo[ir,j],conj(ACd[irr,j])))
+        # e = sum(ein"pqrs, pqrs -> "(lr,hy))
+        # n = sum(ein"pprr -> "(lr))
         params.verbosity >= 4 && println("hy = $(e/n)")
-        etol += e/n
+        etol -= e/n
     end
 
     params.verbosity >= 3 && println("energy = $(etol/Ni/Nj/2)")

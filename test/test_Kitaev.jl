@@ -4,11 +4,11 @@ using CUDA
 using TeneT
 
 Random.seed!(100)
-atype = CuArray
+atype = Array
 Ni, Nj = 1, 1
 D, χ = 2, 10
 No = 0
-S = 0.5
+S = 1.5
 model = Kitaev(S,-1.0,-1.0,-1.0)
 maxiter = 10
 if No == 0
@@ -28,8 +28,8 @@ boundary_alg = VUMPS(ifupdown=true,
 params = iPEPSOptimize(boundary_alg=boundary_alg, 
                        reuse_env=true, 
                        verbosity=4, 
-                       maxiter=0,
+                       maxiter=100,
                        tol=1e-10,
-                       folder="data/merge/$model/$(Nj)x$(Nj)/"
+                       folder="data/merge/$model/$(Ni)x$(Nj)/"
 )
-optimise_ipeps(A, h, χ, params)
+optimise_ipeps(A, model, χ, params)
