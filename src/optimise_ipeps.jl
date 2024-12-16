@@ -30,10 +30,29 @@ function indexperm_symmetrize(ipeps)
     return ipeps / norm(ipeps)
 end
 
+function bulid_Wp(S)
+    d = Int(2*S + 1)
+    Wp = zeros(ComplexF64, 2,2,2,d,d)
+    Wp[1,1,1,:,:] .= I(d)
+    Wp[1,2,2,:,:] .= exp(1im * π * const_Sx(S))
+    Wp[2,1,2,:,:] .= exp(1im * π * const_Sy(S))
+    Wp[2,2,1,:,:] .= exp(1im * π * const_Sz(S))
+    Wp = ein"edapq, ebcrs -> abcdprqs"(Wp, Wp)
+    return reshape(Wp, 2,2,2,2,d^2,d^2)
+end
+
+function bulid_A(A, Wp) 
+    D, d, Ni, Nj = size(A)[[1,5,6,7]]
+    Ap = Zygote.Buffer(A, D*2,D*2,D*2,D*2,d,Ni,Nj)
+    for j in 1:Nj, i in 1:Ni
+        Ap[:,:,:,:,:,i,j] = reshape(ein"abcdx, efghxy -> aebfcgdhy"(A[:,:,:,:,:,i,j], Wp), D*2,D*2,D*2,D*2,d)
+    end
+    return copy(Ap)
+end
+
 function bulid_M(A)
     D, d, Ni, Nj = size(A)[[1,5,6,7]]
     M = [reshape(ein"abcde,fghme->afbgchdm"(A[:,:,:,:,:,i,j], conj(A[:,:,:,:,:,i,j])), D^2,D^2,D^2,D^2) for i in 1:Ni, j in 1:Nj]
-    # M = [(i==j ? A : B) for i in 1:2, j in 1:2]
     return M
 end
 
@@ -84,15 +103,21 @@ two-site hamiltonian `h`. The minimization is done using `Optim` with default-me
 providing `optimmethod`. Other options to optim can be passed with `optimargs`.
 The energy is calculated using vumps with key include parameters `χ`, `tol` and `maxiter`.
 """
-function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize)
+function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize; ifWp=false)
     D = size(A, 1)
     oc = optcont(D, χ)
-
-    # A = indexperm_symmetrize(A)
-    M = bulid_M(A)
+    if ifWp
+        Wp = _arraytype(A)(bulid_Wp(model.S))
+        A′ = bulid_A(A, Wp)
+        M = bulid_M(A′)
+    else
+        M = bulid_M(A)
+    end
+    
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
 
     function f(A) 
+        ifWp && (A = bulid_A(A, Wp))
         return real(energy(A, model, rt, oc, params))
     end
     function g(A)
