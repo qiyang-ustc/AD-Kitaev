@@ -35,7 +35,7 @@ function bulid_Mp(A, O)
     return reshape(ein"(abcde,en),fghmn->afbgchdm"(A, O, conj(A)), D^2, D^2, D^2, D^2)
 end
 
-function expectation_value(model, A, M, env, oc, params::iPEPSOptimize)
+function expectation_value(model, Dz, A, M, env, oc, params::iPEPSOptimize)
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
     # hx, hy, hz = h
     # d = size(hx, 1)
@@ -52,6 +52,7 @@ function expectation_value(model, A, M, env, oc, params::iPEPSOptimize)
     Sx = Zygote.@ignore const_Sx(S)
     Sy = Zygote.@ignore const_Sy(S)
     Sz = Zygote.@ignore const_Sz(S)
+    Sz2 = Sz * Sz 
 
     Ni, Nj = size(ACu)
     oc_H, oc_V = oc
@@ -70,12 +71,14 @@ function expectation_value(model, A, M, env, oc, params::iPEPSOptimize)
         params.verbosity >= 4 && println("hz = $(e/n)")
         etol -= e/n
 
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz^2 * ein"ac,bd->abcd"(Sz2, Sz2), d^2,d^2)))
         e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
         # e = sum(ein"pq, pq -> "(lr,hx))
         # n = sum(ein"pp -> "(lr))
-        params.verbosity >= 4 && println("hx = $(e/n)")
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
+        ex = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
+        params.verbosity >= 4 && println("hx = $(ex/n)")
         etol -= e/n
 
         ir  = mod1(i + 1, Ni)

@@ -1,5 +1,6 @@
 @kwdef mutable struct iPEPSOptimize
     boundary_alg::VUMPS
+    boundary_alg_AD::VUMPS
     reuse_env::Bool = Defaults.reuse_env
     verbosity::Int = Defaults.verbosity
     maxiter::Int = Defaults.fpgrad_maxiter
@@ -76,7 +77,7 @@ end
 return the energy of the `bcipeps` 2-site hamiltonian `h` and calculated via a
 BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 """
-function energy(A, model, rt, oc, params::iPEPSOptimize)
+function energy(A, model, Dz, rt, oc, params::iPEPSOptimize)
     # A = indexperm_symmetrize(A)
     A /= norm(A)
     M = bulid_M(A)
@@ -85,13 +86,11 @@ function energy(A, model, rt, oc, params::iPEPSOptimize)
     Zygote.@ignore update!(rt, leading_boundary(rt, M, params.boundary_alg))
 
     params.verbosity >= 4 && println("real AD calculation")
-    params_diff = deepcopy(params)
-    params_diff.boundary_alg.maxiter = 10
-    rt′ = leading_boundary(rt, M, params_diff.boundary_alg)
+    rt′ = leading_boundary(rt, M, params.boundary_alg_AD)
 
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
-    return expectation_value(model, A, M, env, oc, params)
+    return expectation_value(model, Dz, A, M, env, oc, params)
 end
 
 """
@@ -103,7 +102,7 @@ two-site hamiltonian `h`. The minimization is done using `Optim` with default-me
 providing `optimmethod`. Other options to optim can be passed with `optimargs`.
 The energy is calculated using vumps with key include parameters `χ`, `tol` and `maxiter`.
 """
-function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize; ifWp=false)
+function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize; ifWp=false, Dz::Real=0.0)
     D = size(A, 1)
     oc = optcont(D, χ)
     if ifWp
@@ -118,7 +117,7 @@ function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize;
 
     function f(A) 
         ifWp && (A = bulid_A(A, Wp))
-        return real(energy(A, model, rt, oc, params))
+        return real(energy(A, model, Dz, rt, oc, params))
     end
     function g(A)
         # f(x)
@@ -147,7 +146,7 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
     message = @sprintf("i = %5d\tt = %0.2f sec\tenergy = %.15f \tgnorm = %.3e\n", os.iteration, os.metadata["time"], os.value, os.g_norm)
 
     maxiter = params.boundary_alg.maxiter
-    folder = joinpath(folder, "D$(D)_χ$(χ)_maxiter$(maxiter)")
+    folder = joinpath(folder, "D$(D)_χ$(χ)")
     !(ispath(folder)) && mkpath(folder)
     if params.verbosity >= 3 && os.iteration % params.show_every == 0
         printstyled(message; bold=true, color=:red)
