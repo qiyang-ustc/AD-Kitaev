@@ -61,36 +61,36 @@ function expectation_value(model, Dz, A, M, env, oc, params::iPEPSOptimize)
         params.verbosity >= 4 && println("===========$i,$j===========")
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)))
-        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)))
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jz * reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)))
+        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(model.Jz * reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)))
         e = sum(oc_H(FLo[i,j],ACu[i,j],Mp1,conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],Mp2,conj(ARd[ir,jr])))
         n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
         # e = sum(ein"pqrs, pqrs -> "(lr,hz))
         # n = sum(ein"pprr -> "(lr))
 
         params.verbosity >= 4 && println("hz = $(e/n)")
-        etol -= e/n
+        etol += e/n
 
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz^2 * ein"ac,bd->abcd"(Sz2, Sz2), d^2,d^2)))
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)))
         e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
         # e = sum(ein"pq, pq -> "(lr,hx))
         # n = sum(ein"pp -> "(lr))
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
         ex = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         params.verbosity >= 4 && println("hx = $(ex/n)")
-        etol -= e/n
+        etol += e/n
 
         ir  = mod1(i + 1, Ni)
         irr = mod1(Ni - i, Ni) 
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)))
-        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)))
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)))
+        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)))
         e = sum(oc_V(ACu[i,j],FLu[i,j],Mp1,FRu[i,j],FLo[ir,j],Mp2,FRo[ir,j],conj(ACd[irr,j])))
         n = sum(oc_V(ACu[i,j],FLu[i,j],M[i,j],FRu[i,j],FLo[ir,j],M[ir,j],FRo[ir,j],conj(ACd[irr,j])))
         # e = sum(ein"pqrs, pqrs -> "(lr,hy))
         # n = sum(ein"pprr -> "(lr))
         params.verbosity >= 4 && println("hy = $(e/n)")
-        etol -= e/n
+        etol += e/n
     end
 
     params.verbosity >= 3 && println("energy = $(etol/Ni/Nj/2)")

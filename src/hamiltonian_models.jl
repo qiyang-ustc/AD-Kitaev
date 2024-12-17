@@ -127,9 +127,9 @@ return a struct representing the Kitaev model with magnetisation fields
 "
 struct Kitaev <: HamiltonianModel
     S::Real
-    Jz::Real
     Jx::Real
     Jy::Real
+    Jz::Real
 end
 Kitaev() = Kitaev(1//2, -1.0, -1.0, -1.0)
 
