@@ -7,10 +7,10 @@ using TeneT
 Random.seed!(42)
 atype = Array
 Ni, Nj = 2, 6
-D, χ = 2, 10
-No = 0
-S = 1.0
-# model_old = Kitaev(0.5,-1.0,-1.0,-1.0/4)
+D, χ = 2, 20
+No = 70
+S = 1.5
+ifWp = false
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
 method = :brickwall
@@ -27,16 +27,19 @@ boundary_alg = VUMPS(ifupdown=true,
                      ifsimple_eig=true,
                      maxiter=30, 
                      miniter=1,
-                     maxiter_ad=3,
-                     miniter_ad=3,
+                     maxiter_ad=0,
+                     miniter_ad=0,
                      verbosity=2
 )
 params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
                                reuse_env=true, 
                                verbosity=4, 
-                               maxiter=100,
+                               maxiter=1000,
                                tol=1e-10,
                                folder=folder
 )
+# A = AD_Kitaev.init_ipeps_form_small_spin(;atype, D=D, file=file, d=Int(2*S+1)^2, Ni=Ni, Nj=Nj)
 A = AD_Kitaev.init_ipeps(;atype, params, No, D, d, Ni, Nj)
-optimise_ipeps(A, model, χ, params; ifWp=false, Dz)
+
+e, mag = observable(A, model, Dz, χ, params; ifWp=false)
+# @show e, mag

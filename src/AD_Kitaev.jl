@@ -22,8 +22,10 @@ export iPEPSOptimize, init_ipeps, optimise_ipeps, energy
 
 include("defaults.jl")
 include("hamiltonian_models.jl")
-include("init_ipeps.jl")
 include("optimise_ipeps.jl")
+include("init_ipeps.jl")
+include("wp_operator.jl")
+include("build_M.jl")
 include("observable.jl")
 
 end

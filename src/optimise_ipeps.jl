@@ -1,6 +1,5 @@
-@kwdef mutable struct iPEPSOptimize
+@kwdef mutable struct iPEPSOptimize{F}
     boundary_alg::VUMPS
-    boundary_alg_AD::VUMPS
     reuse_env::Bool = Defaults.reuse_env
     verbosity::Int = Defaults.verbosity
     maxiter::Int = Defaults.fpgrad_maxiter
@@ -12,71 +11,16 @@
 end
 
 """
-    indexperm_symmetrize(ipeps)
-
-return the symmetrized `ipeps` by permuting the indices of the `ipeps` to ensure
-```
-        4
-        │
- 1 ── ipeps ── 3
-        │
-        2
-```
-"""
-function indexperm_symmetrize(ipeps)
-    # ipeps += permutedims(ipeps, (3,2,1,4,5)) 
-    # ipeps += permutedims(ipeps, (1,2,4,3,5)) 
-    # ipeps += permutedims(ipeps, (4,2,3,1,5)) 
-    # ipeps += permutedims(ipeps, (3,2,4,1,5)) 
-    return ipeps / norm(ipeps)
-end
-
-function bulid_Wp(S)
-    d = Int(2*S + 1)
-    Wp = zeros(ComplexF64, 2,2,2,d,d)
-    Wp[1,1,1,:,:] .= I(d)
-    Wp[1,2,2,:,:] .= exp(1im * π * const_Sx(S))
-    Wp[2,1,2,:,:] .= exp(1im * π * const_Sy(S))
-    Wp[2,2,1,:,:] .= exp(1im * π * const_Sz(S))
-    Wp = ein"edapq, ebcrs -> abcdprqs"(Wp, Wp)
-    return reshape(Wp, 2,2,2,2,d^2,d^2)
-end
-
-function bulid_A(A, Wp) 
-    D, d, Ni, Nj = size(A)[[1,5,6,7]]
-    Ap = Zygote.Buffer(A, D*2,D*2,D*2,D*2,d,Ni,Nj)
-    for j in 1:Nj, i in 1:Ni
-        Ap[:,:,:,:,:,i,j] = reshape(ein"abcdx, efghxy -> aebfcgdhy"(A[:,:,:,:,:,i,j], Wp), D*2,D*2,D*2,D*2,d)
-    end
-    return copy(Ap)
-end
-
-function bulid_M(A)
-    D, d, Ni, Nj = size(A)[[1,5,6,7]]
-    M = [reshape(ein"abcde,fghme->afbgchdm"(A[:,:,:,:,:,i,j], conj(A[:,:,:,:,:,i,j])), D^2,D^2,D^2,D^2) for i in 1:Ni, j in 1:Nj]
-    return M
-end
-
-
-"""
     energy(h, bcipeps; χ, tol, maxiter)
 return the energy of the `bcipeps` 2-site hamiltonian `h` and calculated via a
 BCVUMPS with parameters `χ`, `tol` and `maxiter`.
 """
 function energy(A, model, Dz, rt, oc, params::iPEPSOptimize)
-    # A = indexperm_symmetrize(A)
-    A /= norm(A)
-    M = bulid_M(A)
-
-    params.verbosity >= 4 && println("for convergence") 
-    Zygote.@ignore update!(rt, leading_boundary(rt, M, params.boundary_alg))
-
-    params.verbosity >= 4 && println("real AD calculation")
-    rt′ = leading_boundary(rt, M, params.boundary_alg_AD)
-
+    M = bulid_M(A, params)
+    rt′ = leading_boundary(rt, M, params.boundary_alg)
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
     env = VUMPSEnv(rt′, M)
-    return expectation_value(model, Dz, A, M, env, oc, params)
+    return energy_value(model, Dz, A, M, env, oc, params)
 end
 
 """
@@ -91,18 +35,20 @@ The energy is calculated using vumps with key include parameters `χ`, `tol` and
 function optimise_ipeps(A::AbstractArray, model, χ::Int, params::iPEPSOptimize; ifWp=false, Dz::Real=0.0)
     D = size(A, 1)
     oc = optcont(D, χ)
+    A = restriction_ipeps(A)
     if ifWp
-        Wp = _arraytype(A)(bulid_Wp(model.S))
-        A′ = bulid_A(A, Wp)
-        M = bulid_M(A′)
+        Wp = _arraytype(A)(bulid_Wp(model.S, params))
+        A′ = bulid_A(A, Wp, params)
+        M = bulid_M(A′, params)
     else
-        M = bulid_M(A)
+        M = bulid_M(A, params)
     end
-    
+
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
 
     function f(A) 
-        ifWp && (A = bulid_A(A, Wp))
+        A = restriction_ipeps(A)
+        ifWp && (A = bulid_A(A, Wp, params))
         return real(energy(A, model, Dz, rt, oc, params))
     end
     function g(A)
@@ -131,8 +77,6 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
 
     message = @sprintf("i = %5d\tt = %0.2f sec\tenergy = %.15f \tgnorm = %.3e\n", os.iteration, os.metadata["time"], os.value, os.g_norm)
 
-    maxiter = params.boundary_alg.maxiter
-    folder = joinpath(folder, "D$(D)_χ$(χ)")
     !(ispath(folder)) && mkpath(folder)
     if params.verbosity >= 3 && os.iteration % params.show_every == 0
         printstyled(message; bold=true, color=:red)

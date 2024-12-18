@@ -21,31 +21,22 @@ function optcont(D::Int, χ::Int)
 	Random.seed!(seed)
 	# oc_H = optimize_code(ein"agj,abc,gkhbpq,jkl,fio,cef,hniers,lno -> pqrs", sd, TreeSA())
     oc_H = ein"(((agj,abc),gkhb),jkl),(((fio,cef),hnie),lno) -> "
-	print("Horizontal Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_H,sd),"\n")
+	# print("Horizontal Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_H,sd),"\n")
     
     sd = Dict('a' => χ, 'b' => D^2, 'c' => χ, 'e' => D^2, 'f' => D^2, 'g' => χ, 'h' => D^2, 'i' => χ, 'j' => D^2, 'k' => D^2, 'l' => χ, 'm' => D^2, 'n' => χ, 'r' => 2, 's' => 2, 'p' => 2, 'q' => 2)
     # oc_V = optimize_code(ein"abc,aeg,ehfbpq,cfi,gjl,jmkhrs,ikn,lmn -> pqrs", sd, TreeSA())
     oc_V = ein"(((abc,aeg),ehfb),cfi),(gjl,(jmkh,(ikn,lmn))) -> "
-    print("Vertical Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_V,sd),"\n") 
+    # print("Vertical Contraction Complexity(seed=$(seed))",OMEinsum.timespace_complexity(oc_V,sd),"\n") 
     oc_H, oc_V
 end
 
-function bulid_Mp(A, O)
+function bulid_Mp(A, O, ::iPEPSOptimize{:merge})
     D = size(A, 1)
     return reshape(ein"(abcde,en),fghmn->afbgchdm"(A, O, conj(A)), D^2, D^2, D^2, D^2)
 end
 
-function expectation_value(model, Dz, A, M, env, oc, params::iPEPSOptimize)
+function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:merge})
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
-    # hx, hy, hz = h
-    # d = size(hx, 1)
-    # Zygote.@ignore begin
-    #     Id = I(d)
-    #     atype = _arraytype(ACu[1])
-    #     hx = atype(reshape(permutedims(hx, (1,3,2,4)), (d^2,d^2)))
-    #     hy = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hy, Id), (d^2,d^2,d^2,d^2)))
-    #     hz = atype(reshape(ein"ae,bfcg,dh -> abefcdgh"(Id, hz, Id), (d^2,d^2,d^2,d^2)))
-    # end
     atype = _arraytype(ACu[1])
     S = model.S
     d = Int(2*S + 1)
@@ -61,34 +52,31 @@ function expectation_value(model, Dz, A, M, env, oc, params::iPEPSOptimize)
         params.verbosity >= 4 && println("===========$i,$j===========")
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jz * reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)))
-        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(model.Jz * reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)))
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jz * reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)), params)
+        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(model.Jz * reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)), params)
         e = sum(oc_H(FLo[i,j],ACu[i,j],Mp1,conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],Mp2,conj(ARd[ir,jr])))
         n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
-        # e = sum(ein"pqrs, pqrs -> "(lr,hz))
-        # n = sum(ein"pprr -> "(lr))
-
         params.verbosity >= 4 && println("hz = $(e/n)")
         etol += e/n
 
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)))
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)), params)
         e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
-        # e = sum(ein"pq, pq -> "(lr,hx))
-        # n = sum(ein"pp -> "(lr))
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)))
-        ex = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
-        params.verbosity >= 4 && println("hx = $(ex/n)")
         etol += e/n
+
+        if Dz != 0
+            Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)), params)
+            e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
+        end
+        params.verbosity >= 4 && println("hx = $(e/n)")
+        
 
         ir  = mod1(i + 1, Ni)
         irr = mod1(Ni - i, Ni) 
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)))
-        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)))
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)), params)
+        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)), params)
         e = sum(oc_V(ACu[i,j],FLu[i,j],Mp1,FRu[i,j],FLo[ir,j],Mp2,FRo[ir,j],conj(ACd[irr,j])))
         n = sum(oc_V(ACu[i,j],FLu[i,j],M[i,j],FRu[i,j],FLo[ir,j],M[ir,j],FRo[ir,j],conj(ACd[irr,j])))
-        # e = sum(ein"pqrs, pqrs -> "(lr,hy))
-        # n = sum(ein"pprr -> "(lr))
         params.verbosity >= 4 && println("hy = $(e/n)")
         etol += e/n
     end
@@ -97,6 +85,113 @@ function expectation_value(model, Dz, A, M, env, oc, params::iPEPSOptimize)
     return etol/Ni/Nj/2
 end
 
+function bulid_Mp(A, O, ::iPEPSOptimize{:brickwall}, i, j)
+    D = size(A, 1)
+    return (i+j) % 2 == 0 ? reshape(ein"(abcde,en),fghmn->afbgchdm"(A, O, conj(A)), D^2,1,D^2,D^2) : (A = permutedims(A, (3,4,1,2,5)); reshape(ein"(abcde,en),fghmn->afbgchdm"(A, O, conj(A)), D^2,D^2,D^2,1))
+end
+
+function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:brickwall})
+    @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
+    atype = _arraytype(ACu[1])
+    S = model.S
+    Sx = Zygote.@ignore const_Sx(S)
+    Sy = Zygote.@ignore const_Sy(S)
+    Sz = Zygote.@ignore const_Sz(S)
+    Sz2 = Sz * Sz 
+
+    Ni, Nj = size(ACu)
+    oc_H, oc_V = oc
+    etol = 0
+    for j = 1:Nj, i = 1:Ni
+        params.verbosity >= 4 && println("===========$i,$j===========")
+        if (i + j) % 2 != 0
+            ir  = mod1(i + 1, Ni)
+            irr = mod1(Ni - i, Ni) 
+            Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jy * Sy), params, i, j)
+            Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(model.Jy * Sy), params, ir, j)
+            e = sum(oc_V(ACu[i,j],FLu[i,j],Mp1,FRu[i,j],FLo[ir,j],Mp2,FRo[ir,j],conj(ACd[irr,j])))
+            n = sum(oc_V(ACu[i,j],FLu[i,j],M[i,j],FRu[i,j],FLo[ir,j],M[ir,j],FRo[ir,j],conj(ACd[irr,j])))
+            params.verbosity >= 4 && println("hy = $(e/n)")
+            etol += e/n
+
+            O_H = model.Jz * Sz
+        else
+            O_H = model.Jx * Sx
+        end
+
+        ir = Ni + 1 - i
+        jr = mod1(j + 1, Nj)
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j],  atype(O_H), params, i,j)
+        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr],  atype(O_H), params, i,jr)
+        e = sum(oc_H(FLo[i,j],ACu[i,j],Mp1,conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],Mp2,conj(ARd[ir,jr])))
+        n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
+        params.verbosity >= 4 && (i + j) % 2 != 0 ? println("hz = $(e/n)") : println("hx = $(e/n)")
+        etol += e/n
+
+        if Dz != 0
+            Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Dz * Sz2), params, i, j)
+            e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
+            n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
+            etol += e/n
+        end
+    end
+
+    params.verbosity >= 3 && println("energy = $(etol/Ni/Nj)")
+    return etol/Ni/Nj
+end
+
+function magnetization_value(model, A, M, env, params::iPEPSOptimize{:brickwall})
+    @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
+    atype = _arraytype(ACu[1])
+    S = model.S
+    Sx = Zygote.@ignore const_Sx(S)
+    Sy = Zygote.@ignore const_Sy(S)
+    Sz = Zygote.@ignore const_Sz(S)
+
+    Ni, Nj = size(ACu)
+    Mag = Array{Array{ComplexF64,1},2}(undef, Ni, Nj)
+    Mnorm = Array{ComplexF64,2}(undef, Ni, Nj)
+    for j = 1:Nj, i = 1:Ni
+        params.verbosity >= 4 && println("===========$i,$j===========")
+        ir = Ni + 1 - i
+        Mpx = bulid_Mp(A[:,:,:,:,:,i,j], atype(Sx), params, i, j)
+        Mx = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpx,conj(ACd[ir,j]),FRo[i,j]))
+
+        Mpy = bulid_Mp(A[:,:,:,:,:,i,j], atype(Sy), params, i, j)
+        My = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpy,conj(ACd[ir,j]),FRo[i,j]))
+
+        Mpz = bulid_Mp(A[:,:,:,:,:,i,j], atype(Sz), params, i, j)
+        Mz = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpz,conj(ACd[ir,j]),FRo[i,j]))
+        
+        n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
+        Mag[i,j] = [Mx/n, My/n, Mz/n]
+        Mnorm[i,j] = norm(Mag[i,j])
+        params.verbosity >= 4 && println("M = $(Mag[i,j])\n|M| = $(Mnorm[i,j])")
+    end
+
+    return Mag, Mnorm
+end
+
+function observable(A, model, Dz, χ, params::iPEPSOptimize; ifWp=false)
+    if ifWp
+        Wp = _arraytype(A)(bulid_Wp(model.S, params))
+        A′ = bulid_A(A, Wp, params)
+        M = bulid_M(A′, params)
+    else
+        M = bulid_M(A, params)
+    end
+    rt = VUMPSRuntime(M, χ, params.boundary_alg)
+    M = bulid_M(A, params)
+    rt = leading_boundary(rt, M, params.boundary_alg)
+    env = VUMPSEnv(rt, M)
+    D = size(A[1], 1)
+    oc = optcont(D, χ)
+
+    e = energy_value(model, Dz, A, M, env, oc, params)
+    mag = magnetization_value(model, A, M, env, params)
+
+    return e, mag
+end
 
 """
 ```
