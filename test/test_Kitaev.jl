@@ -7,21 +7,16 @@ using TeneT
 Random.seed!(42)
 atype = Array
 Ni, Nj = 1, 1
-D, χ = 3, 20
-No = 0
+D, χ = 2, 20
+No = 62
 S = 1.0
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
 method = :merge
 # method = :brickwall
-folder = "data/$method/Dz$Dz/$model/$(Ni)x$(Nj)/D$(D)_χ$(χ)/"
+folder = "data/$method/Dz$Dz/$model/$(Ni)x$(Nj)/"
 ############################################################################################
 
-if method == :merge
-    d = Int(2*S+1)^2
-elseif method == :brickwall
-    d = Int(2*S+1)
-end
 boundary_alg = VUMPS(ifupdown=true,
                      ifdownfromup=false, 
                      ifsimple_eig=true,
@@ -38,5 +33,5 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
                                tol=1e-10,
                                folder=folder
 )
-A = AD_Kitaev.init_ipeps(;atype, params, No, D, d, Ni, Nj)
-optimise_ipeps(A, model, χ, params; ifWp=false, Dz)
+A = init_ipeps(;atype, model, params, No, ifWp=true, D, χ=10, Ni, Nj)
+optimise_ipeps(A, model, χ, params; Dz, ifWp=false)

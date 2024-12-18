@@ -3,19 +3,24 @@
 
 return a random `ipeps` with bond dimension `D` and physical dimension 2.
 """
-function init_ipeps(;atype = Array, params::iPEPSOptimize{F}, No::Int=0, D::Int, d::Int, Ni::Int, Nj::Int) where F
+function init_ipeps(;atype = Array, model, params::iPEPSOptimize{F}, No::Int=0, ifWp::Bool=false, D::Int, χ::Int, Ni::Int, Nj::Int) where F
+    d = Int(2*model.S + 1) 
     if No != 0
-        file = joinpath(params.folder, "ipeps/ipeps_No.$(No).jld2")
+        file = joinpath(params.folder, "D$(D)_χ$(χ)/ipeps/ipeps_No.$(No).jld2")
         @info "load ipeps from file: $file"
         A = load(file, "bcipeps")
     else
         @info "generate random ipeps"
         if F == :merge
-            A = rand(ComplexF64, D,D,D,D,d, Ni,Nj) .- 0.5
+            A = rand(ComplexF64, D,D,D,D,d^2, Ni,Nj) .- 0.5
         elseif F == :brickwall
             A = rand(ComplexF64, D,1,D,D,d, Ni,Nj) .- 0.5
         end
         A /= norm(A)
+    end
+    if ifWp
+        Wp = _arraytype(A)(bulid_Wp(model.S, params))
+        A = bulid_A(A, Wp, params) + randn(ComplexF64, (size(A)[1:4].*2...,size(A,5),Ni,Nj)) * 1e-1
     end
     return atype(A)
 end

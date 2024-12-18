@@ -77,6 +77,7 @@ function writelog(os::OptimizationState, params::iPEPSOptimize, D::Int, χ::Int)
 
     message = @sprintf("i = %5d\tt = %0.2f sec\tenergy = %.15f \tgnorm = %.3e\n", os.iteration, os.metadata["time"], os.value, os.g_norm)
 
+    folder = joinpath(folder, "D$(D)_χ$(χ)")
     !(ispath(folder)) && mkpath(folder)
     if params.verbosity >= 3 && os.iteration % params.show_every == 0
         printstyled(message; bold=true, color=:red)

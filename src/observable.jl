@@ -213,14 +213,8 @@ function magnetization_value(model, A, M, env, params::iPEPSOptimize{:brickwall}
     return Mag, Mnorm
 end
 
-function observable(A, model, Dz, χ, params::iPEPSOptimize; ifWp=false)
-    if ifWp
-        Wp = _arraytype(A)(bulid_Wp(model.S, params))
-        A = bulid_A(A, Wp, params)
-        M = bulid_M(A, params)
-    else
-        M = bulid_M(A, params)
-    end
+function observable(A, model, Dz, χ, params::iPEPSOptimize)
+    M = bulid_M(A, params)
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
     rt = leading_boundary(rt, M, params.boundary_alg)
     env = VUMPSEnv(rt, M)
