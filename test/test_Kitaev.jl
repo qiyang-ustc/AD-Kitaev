@@ -6,14 +6,14 @@ using TeneT
 #####################################    parameters      ###################################
 Random.seed!(42)
 atype = Array
-Ni, Nj = 2, 6
-D, χ = 2, 10
+Ni, Nj = 1, 1
+D, χ = 3, 20
 No = 0
 S = 1.0
-# model_old = Kitaev(0.5,-1.0,-1.0,-1.0/4)
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
-method = :brickwall
+method = :merge
+# method = :brickwall
 folder = "data/$method/Dz$Dz/$model/$(Ni)x$(Nj)/D$(D)_χ$(χ)/"
 ############################################################################################
 
@@ -25,7 +25,7 @@ end
 boundary_alg = VUMPS(ifupdown=true,
                      ifdownfromup=false, 
                      ifsimple_eig=true,
-                     maxiter=30, 
+                     maxiter=10, 
                      miniter=1,
                      maxiter_ad=3,
                      miniter_ad=3,

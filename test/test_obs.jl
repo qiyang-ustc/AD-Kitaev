@@ -6,14 +6,15 @@ using TeneT
 #####################################    parameters      ###################################
 Random.seed!(42)
 atype = Array
-Ni, Nj = 2, 6
-D, χ = 2, 20
-No = 70
-S = 1.5
+Ni, Nj = 2, 2
+D, χ = 2, 10
+No = 92
+S = 1.0
 ifWp = false
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
 method = :brickwall
+# method = :merge
 folder = "data/$method/Dz$Dz/$model/$(Ni)x$(Nj)/D$(D)_χ$(χ)/"
 ############################################################################################
 
@@ -41,5 +42,5 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
 # A = AD_Kitaev.init_ipeps_form_small_spin(;atype, D=D, file=file, d=Int(2*S+1)^2, Ni=Ni, Nj=Nj)
 A = AD_Kitaev.init_ipeps(;atype, params, No, D, d, Ni, Nj)
 
-e, mag = observable(A, model, Dz, χ, params; ifWp=false)
+e, mag = observable(A, model, Dz, χ, params; ifWp)
 # @show e, mag

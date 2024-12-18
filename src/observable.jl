@@ -140,6 +140,47 @@ function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:brickwall
     return etol/Ni/Nj
 end
 
+function magnetization_value(model, A, M, env, params::iPEPSOptimize{:merge})
+    @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
+    atype = _arraytype(ACu[1])
+    S = model.S
+    d = Int(2*S + 1)
+    Sx = Zygote.@ignore const_Sx(S)
+    Sy = Zygote.@ignore const_Sy(S)
+    Sz = Zygote.@ignore const_Sz(S)
+
+    Ni, Nj = size(ACu)
+    Mag = Array{Array{ComplexF64,1},3}(undef, Ni, Nj, 2)
+    Mnorm = Array{ComplexF64,3}(undef, Ni, Nj, 2)
+    for j = 1:Nj, i = 1:Ni
+        params.verbosity >= 4 && println("===========$i,$j===========")
+        ir = Ni + 1 - i
+        Mpx1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sx, I(d)), d^2,d^2)), params)
+        Mpx2 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sx), d^2,d^2)), params)
+        Mx1 = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpx1,conj(ACd[ir,j]),FRo[i,j]))
+        Mx2 = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpx2,conj(ACd[ir,j]),FRo[i,j]))
+
+        Mpy1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)), params)
+        Mpy2 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)), params)
+        My1 = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpy1,conj(ACd[ir,j]),FRo[i,j]))
+        My2 = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpy2,conj(ACd[ir,j]),FRo[i,j]))
+
+        Mpz1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)), params)
+        Mpz2 = bulid_Mp(A[:,:,:,:,:,i,j], atype(reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)), params)
+        Mz1 = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpz1,conj(ACd[ir,j]),FRo[i,j]))
+        Mz2 = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mpz2,conj(ACd[ir,j]),FRo[i,j]))
+        
+        n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
+        Mag[i,j,1] = [Mx1/n, My1/n, Mz1/n]
+        Mag[i,j,2] = [Mx2/n, My2/n, Mz2/n]
+        Mnorm[i,j,1] = norm(Mag[i,j,1])
+        Mnorm[i,j,2] = norm(Mag[i,j,2])
+        params.verbosity >= 4 && println("M1 = $(Mag[i,j,1])\nM2 = $(Mag[i,j,2])\n|M1| = $(Mnorm[i,j,1])\n|M2| = $(Mnorm[i,j,2])")
+    end
+
+    return Mag, Mnorm
+end
+
 function magnetization_value(model, A, M, env, params::iPEPSOptimize{:brickwall})
     @unpack ACu, ARu, ACd, ARd, FLu, FRu, FLo, FRo = env
     atype = _arraytype(ACu[1])
@@ -175,13 +216,12 @@ end
 function observable(A, model, Dz, χ, params::iPEPSOptimize; ifWp=false)
     if ifWp
         Wp = _arraytype(A)(bulid_Wp(model.S, params))
-        A′ = bulid_A(A, Wp, params)
-        M = bulid_M(A′, params)
+        A = bulid_A(A, Wp, params)
+        M = bulid_M(A, params)
     else
         M = bulid_M(A, params)
     end
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
-    M = bulid_M(A, params)
     rt = leading_boundary(rt, M, params.boundary_alg)
     env = VUMPSEnv(rt, M)
     D = size(A[1], 1)
