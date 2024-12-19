@@ -20,7 +20,7 @@ function init_ipeps(;atype = Array, model, params::iPEPSOptimize{F}, No::Int=0, 
     end
     if ifWp
         Wp = _arraytype(A)(bulid_Wp(model.S, params))
-        A = bulid_A(A, Wp, params) + randn(ComplexF64, (size(A)[1:4].*2...,size(A,5),Ni,Nj)) * ϵ
+        A = bulid_A(A + randn(ComplexF64, size(A)) * ϵ, Wp, params) 
     end
     return atype(A)
 end
