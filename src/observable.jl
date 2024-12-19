@@ -218,7 +218,7 @@ function observable(A, model, Dz, χ, params::iPEPSOptimize)
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
     rt = leading_boundary(rt, M, params.boundary_alg)
     env = VUMPSEnv(rt, M)
-    D = size(A[1], 1)
+    D = size(A, 1)
     oc = optcont(D, χ)
 
     e = energy_value(model, Dz, A, M, env, oc, params)

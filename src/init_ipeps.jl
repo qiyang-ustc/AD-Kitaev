@@ -3,7 +3,7 @@
 
 return a random `ipeps` with bond dimension `D` and physical dimension 2.
 """
-function init_ipeps(;atype = Array, model, params::iPEPSOptimize{F}, No::Int=0, ifWp::Bool=false, D::Int, χ::Int, Ni::Int, Nj::Int) where F
+function init_ipeps(;atype = Array, model, params::iPEPSOptimize{F}, No::Int=0, ifWp::Bool=false, ϵ::Real=1e-3, D::Int, χ::Int, Ni::Int, Nj::Int) where F
     d = Int(2*model.S + 1) 
     if No != 0
         file = joinpath(params.folder, "D$(D)_χ$(χ)/ipeps/ipeps_No.$(No).jld2")
@@ -20,7 +20,7 @@ function init_ipeps(;atype = Array, model, params::iPEPSOptimize{F}, No::Int=0, 
     end
     if ifWp
         Wp = _arraytype(A)(bulid_Wp(model.S, params))
-        A = bulid_A(A, Wp, params) + randn(ComplexF64, (size(A)[1:4].*2...,size(A,5),Ni,Nj)) * 1e-1
+        A = bulid_A(A, Wp, params) + randn(ComplexF64, (size(A)[1:4].*2...,size(A,5),Ni,Nj)) * ϵ
     end
     return atype(A)
 end
