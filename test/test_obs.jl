@@ -5,12 +5,13 @@ using TeneT
 
 #####################################    parameters      ###################################
 Random.seed!(42)
-atype = Array
+atype = CuArray
 Ni, Nj = 1, 1
-D, χ = 2, 10
-No = 62
+D, χ = 4, 80
+No = 441
 S = 1.0
 ifWp = false
+ϵ = 5*1e-1
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
 # method = :brickwall
@@ -34,5 +35,5 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
                                tol=1e-10,
                                folder=folder
 )
-A = init_ipeps(;atype, model, params, No, ifWp, D, χ, Ni, Nj)
+A = init_ipeps(;atype, model, params, No, ifWp, ϵ, D, χ=20, Ni, Nj)
 e, mag = observable(A, model, Dz, χ, params)

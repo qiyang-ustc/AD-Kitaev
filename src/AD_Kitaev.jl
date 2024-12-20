@@ -11,6 +11,7 @@ using Printf
 using Parameters
 using Zygote
 using TeneT
+using HDF5
 
 using TeneT: ALCtoAC, _arraytype, update!
 

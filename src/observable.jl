@@ -49,23 +49,30 @@ function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:merge})
     oc_H, oc_V = oc
     etol = 0
     for j = 1:Nj, i = 1:Ni
+        if (i,j) in [(1,1),(2,2)]
+            Jx, Jy, Jz = model.Jx*1.0, model.Jy*1.0, model.Jz
+        elseif (i,j) in [(1,2),(2,3)]
+            Jx, Jy, Jz = model.Jx*1.0, model.Jy, model.Jz*1.0
+        else
+            Jx, Jy, Jz = model.Jx, model.Jy*1.0, model.Jz*1.0
+        end
         params.verbosity >= 4 && println("===========$i,$j===========")
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jz * reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)), params)
-        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(model.Jz * reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)), params)
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jz * reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)), params)
+        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(Jz * reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)), params)
         e = sum(oc_H(FLo[i,j],ACu[i,j],Mp1,conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],Mp2,conj(ARd[ir,jr])))
         n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
         params.verbosity >= 4 && println("hz = $(e/n)")
         etol += e/n
 
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)), params)
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)), params)
         e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
         etol += e/n
 
         if Dz != 0
-            Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jx * reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)), params)
+            Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)), params)
             e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         end
         params.verbosity >= 4 && println("hx = $(e/n)")
@@ -73,8 +80,8 @@ function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:merge})
 
         ir  = mod1(i + 1, Ni)
         irr = mod1(Ni - i, Ni) 
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)), params)
-        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(model.Jy * reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)), params)
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jy * reshape(ein"ac,bd->abcd"(I(d), Sy), d^2,d^2)), params)
+        Mp2 = bulid_Mp(A[:,:,:,:,:,ir,j], atype(Jy * reshape(ein"ac,bd->abcd"(Sy, I(d)), d^2,d^2)), params)
         e = sum(oc_V(ACu[i,j],FLu[i,j],Mp1,FRu[i,j],FLo[ir,j],Mp2,FRo[ir,j],conj(ACd[irr,j])))
         n = sum(oc_V(ACu[i,j],FLu[i,j],M[i,j],FRu[i,j],FLo[ir,j],M[ir,j],FRo[ir,j],conj(ACd[irr,j])))
         params.verbosity >= 4 && println("hy = $(e/n)")
@@ -114,9 +121,9 @@ function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:brickwall
             params.verbosity >= 4 && println("hy = $(e/n)")
             etol += e/n
 
-            O_H = model.Jz * Sz
+            O_H = model.Jz * Sx
         else
-            O_H = model.Jx * Sx
+            O_H = model.Jx * Sz
         end
 
         ir = Ni + 1 - i
