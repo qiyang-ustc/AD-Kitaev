@@ -184,6 +184,7 @@ function magnetization_value(model, A, M, env, params::iPEPSOptimize{:merge})
         Mnorm[i,j,2] = norm(Mag[i,j,2])
         params.verbosity >= 4 && println("M1 = $(Mag[i,j,1])\nM2 = $(Mag[i,j,2])\n|M1| = $(Mnorm[i,j,1])\n|M2| = $(Mnorm[i,j,2])")
     end
+    params.verbosity >= 4 && println("|M|_mean = $(sum(Mnorm)/Ni/Nj)")
 
     return Mag, Mnorm
 end
@@ -217,6 +218,7 @@ function magnetization_value(model, A, M, env, params::iPEPSOptimize{:brickwall}
         params.verbosity >= 4 && println("M = $(Mag[i,j])\n|M| = $(Mnorm[i,j])")
     end
 
+    params.verbosity >= 4 && println("|M|_mean = $(sum(Mnorm)/Ni/Nj)")
     return Mag, Mnorm
 end
 

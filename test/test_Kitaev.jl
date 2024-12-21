@@ -9,7 +9,7 @@ atype = Array
 Ni, Nj = 2, 6
 D, χ = 3, 10
 No = 0
-S = 1.5
+S = 1.0
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
 # method = :merge
@@ -35,5 +35,5 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
 )
 # A = init_ipeps(;atype, model, params, No, ifWp=false, ϵ = 5*1e-2, D, χ=20, Ni, Nj)
 # A = AD_Kitaev.init_ipeps_spin111(;atype, model, params, No, ifWp=true, ϵ = 0, χ, Ni, Nj)
-A = AD_Kitaev.init_ipeps_h5(;atype = Array, model, D, Ni, Nj)
+A = AD_Kitaev.init_ipeps_h5(;atype = Array, model, file="./data/kitsShf_sikh2nfcr7D3D3.h5", D, Ni, Nj)
 optimise_ipeps(A, model, χ, params; Dz, ifWp=false)
