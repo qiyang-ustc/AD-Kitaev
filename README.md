@@ -11,6 +11,8 @@ move to the file and run `julia REPL`, press `]` into `Pkg REPL`
   Activating project at `..\AD_Kitaev`
 
 (AD_Kitaev) pkg> instantiate
+
+(AD_Kitaev) pkg> add "https://github.com/XingyuZhang2018/TeneT.jl/tree/Array-of-Array"
 ```
 
 ## run

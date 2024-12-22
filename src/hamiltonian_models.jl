@@ -53,7 +53,7 @@ struct Kitaev <: HamiltonianModel
     Jy::Real
     Jz::Real
 end
-Kitaev(S,Jx,Jy,Jz) = Kitaev(Rational(S), Jx, Jy, Jz)
+Kitaev(S::Int,Jx,Jy,Jz) = Kitaev(Rational(S), Jx, Jy, Jz)
 
 """
     hamiltonian(model::Kitaev)
