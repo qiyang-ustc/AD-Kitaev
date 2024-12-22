@@ -1,6 +1,6 @@
 name = "AD_Kitaev"
 uuid = "28ffd45a-d8fc-40b6-a096-198d7e880fe2"
-authors = ["XingyuZhang2018 <zhangxingyu@iphy.ac.cn> and contributors"]
+authors = ["XingyuZhang2018 <zhangxingyu@iphy.ac.cn> and QiYang <qiyang@mail.ustc.edu.cn> contributors"]
 version = "0.1.0"
 
 [deps]
