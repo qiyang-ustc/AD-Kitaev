@@ -11,7 +11,7 @@ Random.seed!(42)
 atype = trycuda() ? CuArray : Array
 su_seed=7
 Ni, Nj = 2, 6
-D, χ = 7, 70
+D, χ = 7, 60
 No = 0
 S = 1
 model = Kitaev(S,1.0,1.0,1.0)

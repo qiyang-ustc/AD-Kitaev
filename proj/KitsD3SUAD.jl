@@ -6,14 +6,14 @@ using CUDA
 using TeneT
 using LinearAlgebra
 
-println("BLAS NCores:",BLAS.get_num_threads())
-
 #####################################    parameters      ###################################
 Random.seed!(42)
+
 atype = trycuda() ? CuArray : Array
+
 su_seed=7
 Ni, Nj = 2, 6
-D, χ = 8, 80
+D, χ = 3, 32
 No = 0
 S = 1
 model = Kitaev(S,1.0,1.0,1.0)

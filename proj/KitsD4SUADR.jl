@@ -6,14 +6,12 @@ using CUDA
 using TeneT
 using LinearAlgebra
 
-println("BLAS NCores:",BLAS.get_num_threads())
-
 #####################################    parameters      ###################################
 Random.seed!(42)
 atype = trycuda() ? CuArray : Array
-su_seed=7
+su_seed=3
 Ni, Nj = 2, 6
-D, χ = 8, 80
+D, χ = 4, 50
 No = 0
 S = 1
 model = Kitaev(S,1.0,1.0,1.0)
@@ -41,7 +39,8 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
 )
 # A = init_ipeps(;atype, model, params, No, ifWp=false, ϵ = 5*1e-2, D, χ, Ni, Nj)
 # A = AD_Kitaev.init_ipeps_spin111(;atype, model, params, No, ifWp=true, ϵ = 0, χ, Ni, Nj)
-A = AD_Kitaev.init_ipeps_h5(;atype, model, file="./data/kitsShf:sikh2nfcr$(su_seed)D$(D)D$(D).h5", D, Ni, Nj)
+A = AD_Kitaev.init_ipeps_h5(;atype, model, file="./data/kitsShf:sikh2nfr$(su_seed)D$(D)D$(D).h5", D, Ni, Nj)
+# A = norm(imag(A)) < 1E-10 ? real(A) : A
 ############################################################################################
 
 optimise_ipeps(A, model, χ, params; Dz, ifWp=false)
