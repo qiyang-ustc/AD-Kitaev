@@ -8,7 +8,7 @@ Random.seed!(42)
 atype = CuArray
 Ni, Nj = 2, 6
 D, χ = 8, 50
-No = 0
+No = 9
 S = 1.0
 model = Kitaev(S,1.0,1.0,1.0)
 Dz = 0.0
@@ -32,9 +32,9 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
                                tol=1e-10,
                                folder=folder
 )
-# A = init_ipeps(;atype, model, params, No, ifWp=false, ϵ = 5*1e-2, D, χ, Ni, Nj)
+A = init_ipeps(;atype, model, params, No, ifWp=false, ϵ = 5*1e-2, D, χ, Ni, Nj)
 # A = AD_Kitaev.init_ipeps_spin111(;atype, model, params, No, ifWp=true, ϵ = 0, χ, Ni, Nj)
-A = AD_Kitaev.init_ipeps_h5(;atype, model, file="./data/kitsShf_sikh2nfcr7D8D8.h5", D, Ni, Nj)
+# A = AD_Kitaev.init_ipeps_h5(;atype, model, file="./data/kitsShf_sikh2nfcr7D8D8.h5", D, Ni, Nj)
 ############################################################################################
 
 optimise_ipeps(A, model, χ, params; Dz, ifWp=false)

@@ -59,23 +59,23 @@ function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:merge})
         params.verbosity >= 4 && println("===========$i,$j===========")
         ir = Ni + 1 - i
         jr = mod1(j + 1, Nj)
-        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jz * reshape(ein"ac,bd->abcd"(I(d), Sz), d^2,d^2)), params)
-        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(Jz * reshape(ein"ac,bd->abcd"(Sz, I(d)), d^2,d^2)), params)
+        Mp1 = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(I(d), Sx), d^2,d^2)), params)
+        Mp2 = bulid_Mp(A[:,:,:,:,:,i,jr], atype(Jx * reshape(ein"ac,bd->abcd"(Sx, I(d)), d^2,d^2)), params)
         e = sum(oc_H(FLo[i,j],ACu[i,j],Mp1,conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],Mp2,conj(ARd[ir,jr])))
         n = sum(oc_H(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,jr],ARu[i,jr],M[i,jr],conj(ARd[ir,jr])))
-        params.verbosity >= 4 && println("hz = $(e/n)")
+        params.verbosity >= 4 && println("hx = $(e/n)")
         etol += e/n
 
-        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(Sx, Sx) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)), params)
+        Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(Sz, Sz) + Dz * ein"ac,bd->abcd"(I(d), Sz2) + Dz * ein"ac,bd->abcd"(Sz2, I(d)), d^2,d^2)), params)
         e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         n = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],M[i,j],conj(ACd[ir,j]),FRo[i,j]))
         etol += e/n
 
         if Dz != 0
-            Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(Sx, Sx), d^2,d^2)), params)
+            Mp = bulid_Mp(A[:,:,:,:,:,i,j], atype(Jx * reshape(ein"ac,bd->abcd"(Sz, Sz), d^2,d^2)), params)
             e = sum(ein"(((aeg,abc),ehfb),ghi),cfi -> "(FLo[i,j],ACu[i,j],Mp,conj(ACd[ir,j]),FRo[i,j]))
         end
-        params.verbosity >= 4 && println("hx = $(e/n)")
+        params.verbosity >= 4 && println("hz = $(e/n)")
         
 
         ir  = mod1(i + 1, Ni)
@@ -121,9 +121,9 @@ function energy_value(model, Dz, A, M, env, oc, params::iPEPSOptimize{:brickwall
             params.verbosity >= 4 && println("hy = $(e/n)")
             etol += e/n
 
-            O_H = model.Jz * Sx
+            O_H = model.Jx * Sx
         else
-            O_H = model.Jx * Sz
+            O_H = model.Jz * Sz
         end
 
         ir = Ni + 1 - i
