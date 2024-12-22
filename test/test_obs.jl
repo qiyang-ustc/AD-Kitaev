@@ -5,9 +5,9 @@ using TeneT
 
 #####################################    parameters      ###################################
 Random.seed!(42)
-atype = Array
+atype = CuArray
 Ni, Nj = 2, 6
-D, χ = 3, 20
+D, χ = 8, 40
 No = 0
 S = 1.0
 ifWp = false
@@ -17,7 +17,6 @@ Dz = 0.0
 method = :brickwall
 # method = :merge
 folder = "data/$method/Dz$Dz/$model/$(Ni)x$(Nj)/"
-############################################################################################
 
 boundary_alg = VUMPS(ifupdown=true,
                      ifdownfromup=false, 
@@ -26,7 +25,8 @@ boundary_alg = VUMPS(ifupdown=true,
                      miniter=1,
                      maxiter_ad=0,
                      miniter_ad=0,
-                     verbosity=2
+                     verbosity=3,
+                     show_every=1
 )
 params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
                                reuse_env=true, 
@@ -35,6 +35,8 @@ params = iPEPSOptimize{method}(boundary_alg=boundary_alg,
                                tol=1e-10,
                                folder=folder
 )
-# A = init_ipeps(;atype, model, params, No, ifWp, ϵ, D, χ=20, Ni, Nj)
-A = AD_Kitaev.init_ipeps_h5(;atype = Array, model, file="./data/kitsShf_sikh2nfcr7D3D3.h5", D, Ni, Nj)
+# A = init_ipeps(;atype, model, params, No, ifWp, ϵ, D, χ, Ni, Nj)
+A = AD_Kitaev.init_ipeps_h5(;atype, model, file="./data/kitsShf_sikh2nfcr7D8D8.h5", D, Ni, Nj)
+############################################################################################
+
 e, mag = observable(A, model, Dz, χ, params)
