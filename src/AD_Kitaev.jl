@@ -21,6 +21,7 @@ export diaglocal, TFIsing, Heisenberg, Kitaev, Kitaev_Heisenberg, K_J_Γ_Γ′, 
 export observable
 export iPEPSOptimize, init_ipeps, optimise_ipeps, energy
 
+include("loadcuda.jl")
 include("defaults.jl")
 include("hamiltonian_models.jl")
 include("optimise_ipeps.jl")

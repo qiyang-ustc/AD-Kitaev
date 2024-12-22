@@ -3,9 +3,10 @@ using Random
 using CUDA
 using TeneT
 
+
 #####################################    parameters      ###################################
 Random.seed!(42)
-atype = CuArray
+atype = trycuda() ? CuArray : Array
 Ni, Nj = 1, 1
 D, χ = 2, 10
 No = 0
