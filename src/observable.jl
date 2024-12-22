@@ -184,7 +184,7 @@ function magnetization_value(model, A, M, env, params::iPEPSOptimize{:merge})
         Mnorm[i,j,2] = norm(Mag[i,j,2])
         params.verbosity >= 4 && println("M1 = $(Mag[i,j,1])\nM2 = $(Mag[i,j,2])\n|M1| = $(Mnorm[i,j,1])\n|M2| = $(Mnorm[i,j,2])")
     end
-    params.verbosity >= 4 && println("|M|_mean = $(sum(Mnorm)/Ni/Nj)")
+    params.verbosity >= 4 && println("|M|_mean = $(sum(Mnorm)/Ni/Nj/2)")
 
     return Mag, Mnorm
 end
@@ -226,7 +226,7 @@ function observable(A, model, Dz, χ, params::iPEPSOptimize)
     M = bulid_M(A, params)
     rt = VUMPSRuntime(M, χ, params.boundary_alg)
     rt = leading_boundary(rt, M, params.boundary_alg)
-    env = VUMPSEnv(rt, M)
+    env = VUMPSEnv(rt, M, params.boundary_alg)
     D = size(A, 1)
     oc = optcont(D, χ)
 

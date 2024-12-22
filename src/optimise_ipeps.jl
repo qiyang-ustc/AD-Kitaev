@@ -19,7 +19,7 @@ function energy(A, model, Dz, rt, oc, params::iPEPSOptimize)
     M = bulid_M(A, params)
     rt′ = leading_boundary(rt, M, params.boundary_alg)
     Zygote.@ignore params.reuse_env && update!(rt, rt′)
-    env = VUMPSEnv(rt′, M)
+    env = VUMPSEnv(rt′, M, params.boundary_alg)
     return energy_value(model, Dz, A, M, env, oc, params)
 end
 

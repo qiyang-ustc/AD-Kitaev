@@ -10,10 +10,11 @@ function init_ipeps(;atype = Array, model, params::iPEPSOptimize{F}, No::Int=0, 
         @info "load ipeps from file: $file"
         A = load(file, "bcipeps")
     else
-        @info "generate random ipeps"
+        @info "generate random $F ipeps"
         if F == :merge
             A = rand(ComplexF64, D,D,D,D,d^2, Ni,Nj) .- 0.5
         elseif F == :brickwall
+            Ni % 2 == 0 && Nj % 2 == 0 || throw(ArgumentError("Ni and Nj should be even"))
             A = rand(ComplexF64, D,1,D,D,d, Ni,Nj) .- 0.5
         end
         A /= norm(A)
