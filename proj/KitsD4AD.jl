@@ -3,12 +3,11 @@ using Random
 using CUDA
 using TeneT
 
-
 #####################################    parameters      ###################################
 Random.seed!(42)
 atype = trycuda() ? CuArray : Array
 Ni, Nj = 1, 1
-D, χ = 2, 10
+D, χ = 4, 16
 No = 0
 S = 1
 model = Kitaev(S,1.0,1.0,1.0)
